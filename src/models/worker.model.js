@@ -32,7 +32,7 @@ const workerSchema = new mongoose.Schema({
             type:Number,
             required:true
         },
-        month:{
+        monthIndex:{
             type:Number,
             required:true
         },

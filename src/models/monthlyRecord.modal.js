@@ -10,9 +10,13 @@ const monthlyRecordSchema = new mongoose.Schema({
         type:Number,
         required:[true, "Year of record is required"]
     },
-    month:{
+    monthIndex:{
         type:Number,
         required:[true, "Month of record is required"]
+    },
+    numberOfDays:{
+        type:Number,
+        required:true
     },
     dailyRecords:[
         {
@@ -28,27 +32,52 @@ const monthlyRecordSchema = new mongoose.Schema({
             presence:{
                 type:String,
                 enum:["half", "present", "absent", "one-and-half"],
-                default:"present"
             },
             wagesOfDay:{
                 type:Number,
-                required:true
+                default:0
             },
             advance:{
                 amount:Number,
-                puspose:String
+                purpose:String
             }
+        }
+    ],
+    settlements:[
+        {
+            dayDate:{
+                type:Number,
+                required:true
+            },
+            wagesOccured:{
+                type:Number,
+                required:true
+            },
+            advanceOccured:{
+                type:Number,
+                required:true
+            },
+            amountTaken:{
+                type:Number,
+                default:0
+            },
+            wagesTransferred:{
+                type:Number,
+                required:true
+            },
+            advanceTransferred:{
+                type:Number,
+                required:true
+            },
         }
     ],
     lastSettlementDate:{
         dayDate:{
             type:Number,
-            required:true
         },
         dayName:{
             type:String,
             enum:["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
-            required:true
         }
     },
     prevWages:{
