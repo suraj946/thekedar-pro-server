@@ -2,10 +2,12 @@ import { Router } from "express";
 import {authenticate} from "../middlewares/auth.middleware.js";
 import { 
     addAttendence, 
+    adjustGivenAmountOnSettlement, 
     createMonthlyRecord, 
     deleteAttendence, 
     getAllRecordsOfYear, 
     getMonthlyRecord, 
+    settleAccount, 
     updateAttendence
 } from "../controllers/monthlyRecord.controller.js";
 
@@ -21,5 +23,8 @@ router.route("/single/:recordId")
       .get(authenticate, getMonthlyRecord);
 
 router.route("/all").get(authenticate, getAllRecordsOfYear);
+
+router.route("/settlement").post(authenticate, settleAccount);
+router.route("/adjust-settlement").post(authenticate, adjustGivenAmountOnSettlement);
 
 export default router;

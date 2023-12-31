@@ -38,7 +38,7 @@ export const createMonthlyRecord = asyncHandler(async(req, res, next) => {
         return next(new ApiError(BAD_REQUEST, "Monthly record is already created for this month"));
     }
 
-    if(Number(numberOfDays) < 29 && Number(numberOfDays) > 32){
+    if(Number(numberOfDays) < 29 || Number(numberOfDays) > 32){
         return next(new ApiError(BAD_REQUEST, "Total days in month can only be in between (29 - 32)"));
     }
 
@@ -266,9 +266,12 @@ export const getAllRecordsOfYear = asyncHandler(async(req, res, next) => {
 export const settleAccount = asyncHandler(async(req, res, next) => {
     let {recordId, dayDate} = req.body;
     if(!recordId || typeof recordId !== "string"){
-        return next(new ApiError(BAD_REQUEST, "Record id id required to do settlements"));
+        return next(new ApiError(BAD_REQUEST, "RecordId is required to do settlements"));
     }
     const monthlyRecord = await MonthlyRecord.findById(recordId);
+    if(!monthlyRecord){
+        return next(new ApiError(NOT_FOUND, "Record not found for settlement"));
+    }
     const lastSettlementDate = monthlyRecord.lastSettlementDate?.dayDate || 0;
 
     if(!dayDate || isNaN(dayDate)){
@@ -279,6 +282,10 @@ export const settleAccount = asyncHandler(async(req, res, next) => {
     if(!(dayDate <= monthlyRecord.numberOfDays && dayDate > lastSettlementDate)){
         return next(new ApiError(BAD_REQUEST, "Invalid date given for settlement"));
     }
+    const todayDate = new NepaliDate(new Date(Date.now())).getDate();
+    if(dayDate > todayDate){
+        return next(new ApiError(BAD_REQUEST, "Settlement cannot be done for future dates"));
+    }
 
     const prevWages = monthlyRecord.prevWages || 0;
     const prevAdvance = monthlyRecord.prevAdvance || 0;
@@ -286,16 +293,18 @@ export const settleAccount = asyncHandler(async(req, res, next) => {
     const amount = (prevWages + currentWages) - (prevAdvance + currentAdvance);
 
     let settlement = {dayDate};
-    let response = {prevWages, prevAdvance, currentWages, currentAdvance};
-    if(amount >= 0){
+    let response = {prevWages, prevAdvance, currentWages, currentAdvance, showForAdjustment : false};
+    if(amount > 0){
         settlement = {
             ...settlement,
             wagesOccured:amount,
             wagesTransferred:amount
         }
         response["wagesOccured"] = amount;
+        response.showForAdjustment = true;
         monthlyRecord.prevWages = amount;
-    }else{
+        monthlyRecord.prevAdvance = 0;
+    }else if(amount < 0){
         settlement = {
             ...settlement,
             advanceOccured:Math.abs(amount),
@@ -303,6 +312,12 @@ export const settleAccount = asyncHandler(async(req, res, next) => {
         }
         response["advanceOccured"] = Math.abs(amount);
         monthlyRecord.prevAdvance = Math.abs(amount);
+        monthlyRecord.prevWages = 0;
+    }else{
+        response["wagesOccured"] = 0;
+        response["advanceOccured"] = 0;
+        monthlyRecord.prevWages = 0;
+        monthlyRecord.prevAdvance = 0;
     }
 
     let newLastSettlementDate = {dayDate}
@@ -320,5 +335,84 @@ export const settleAccount = asyncHandler(async(req, res, next) => {
         OK,
         "Settlement done successfully",
         response
+    ));
+});
+
+export const adjustGivenAmountOnSettlement = asyncHandler(async(req, res, next) =>{
+    const {recordId, settlementDayDate, givenAmount} = req.body;
+    if(!recordId || typeof recordId !== "string"){
+        return next(new ApiError(BAD_REQUEST, "RecordId is required for settlement adjustment"));
+    }
+
+    if(!settlementDayDate || isNaN(settlementDayDate)){
+        return next(new ApiError(BAD_REQUEST, "Settled date is required for adjustment"));
+    }
+
+    if(!givenAmount || isNaN(givenAmount)){
+        return next(new ApiError(BAD_REQUEST, "Amount to give to worker is required for adjustment"));
+    }
+
+    const monthlyRecord = await MonthlyRecord.findById(recordId);
+    if(!monthlyRecord){
+        return next(new ApiError(NOT_FOUND, "Record not found for settlement adjustment"));
+    }
+
+    const lastSettlementDate = monthlyRecord.lastSettlementDate?.dayDate;
+    if(!lastSettlementDate || typeof lastSettlementDate !== "number"){
+        return next(new ApiError(BAD_REQUEST, "No settlement is done in this month"));
+    }
+    const todayDate = new NepaliDate(new Date(Date.now())).getDate();
+    if(Number(settlementDayDate) !== lastSettlementDate || settlementDayDate !== todayDate){
+        return next(new ApiError(BAD_REQUEST, "Adjustment can only be done on settlement date"));       
+    }
+
+    let {
+        dayDate,
+        wagesOccured,
+        advanceOccured,
+        amountTaken,
+        wagesTransferred,
+        advanceTransferred
+    } = monthlyRecord.settlements.find(e => e.dayDate === Number(settlementDayDate));
+
+    if(wagesOccured > 0){
+        const remainingAmount = wagesOccured - givenAmount;
+        if(remainingAmount > 0){
+            wagesOccured = remainingAmount;
+            wagesTransferred = remainingAmount;
+            monthlyRecord.prevWages = remainingAmount;
+            monthlyRecord.prevAdvance = 0;
+        }else if(remainingAmount < 0){
+            advanceOccured = Math.abs(remainingAmount);
+            advanceTransferred = Math.abs(remainingAmount);
+            monthlyRecord.prevWages = 0;
+            monthlyRecord.prevAdvance = Math.abs(remainingAmount);
+        }else{
+            wagesOccured = 0;
+            advanceOccured = 0;;
+            monthlyRecord.prevWages = 0;
+            monthlyRecord.prevAdvance = 0;
+        }
+        amountTaken = givenAmount;
+    }else{
+        return next(new ApiError(BAD_REQUEST, "No wages is pending to give on this settlement"));
+    }
+
+    monthlyRecord.settlements = monthlyRecord.settlements.filter(rec => rec.dayDate !== dayDate);
+    monthlyRecord.settlements.push({
+        dayDate,
+        wagesOccured,
+        advanceOccured,
+        amountTaken,
+        wagesTransferred,
+        advanceTransferred
+    });
+
+    await monthlyRecord.save();
+
+    res.status(OK).json(new ApiResponse(
+        OK,
+        "Amount adjustment on settlement success",
+        {wagesOccured, advanceOccured, wagesTransferred, advanceTransferred, amountTaken}
     ));
 });

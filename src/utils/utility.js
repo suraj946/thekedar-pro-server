@@ -104,7 +104,7 @@ export const calculateAmounts = (recordsArray, lastSettlementDate, todayDate) =>
     if(record.dayDate > lastSettlementDate && record.dayDate <= todayDate){
       currentWages += record.wagesOfDay;
       if(record.advance && typeof record.advance.amount === "number"){
-        currentAdvance += arr[i].advance.amount;
+        currentAdvance += record.advance.amount;
       }
     }
   }

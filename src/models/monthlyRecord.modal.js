@@ -51,11 +51,11 @@ const monthlyRecordSchema = new mongoose.Schema({
             },
             wagesOccured:{
                 type:Number,
-                required:true
+                default:0
             },
             advanceOccured:{
                 type:Number,
-                required:true
+                default:0
             },
             amountTaken:{
                 type:Number,
@@ -63,11 +63,11 @@ const monthlyRecordSchema = new mongoose.Schema({
             },
             wagesTransferred:{
                 type:Number,
-                required:true
+                default:0
             },
             advanceTransferred:{
                 type:Number,
-                required:true
+                default:0
             },
         }
     ],
