@@ -6,7 +6,9 @@ import {
     createMonthlyRecord, 
     deleteAttendence, 
     getAllRecordsOfYear, 
+    getAllSettlementOfMonth, 
     getMonthlyRecord, 
+    getSingleSettlement, 
     settleAccount, 
     updateAttendence
 } from "../controllers/monthlyRecord.controller.js";
@@ -26,5 +28,7 @@ router.route("/all").get(authenticate, getAllRecordsOfYear);
 
 router.route("/settlement").post(authenticate, settleAccount);
 router.route("/adjust-settlement").post(authenticate, adjustGivenAmountOnSettlement);
+router.route("/all-settlements/:recordId").get(authenticate, getAllSettlementOfMonth);
+router.route("/single-settlement").get(authenticate, getSingleSettlement);
 
 export default router;

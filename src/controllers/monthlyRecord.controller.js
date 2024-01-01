@@ -363,7 +363,7 @@ export const adjustGivenAmountOnSettlement = asyncHandler(async(req, res, next) 
     }
     const todayDate = new NepaliDate(new Date(Date.now())).getDate();
     if(Number(settlementDayDate) !== lastSettlementDate || settlementDayDate !== todayDate){
-        return next(new ApiError(BAD_REQUEST, "Adjustment can only be done on settlement date"));       
+        return next(new ApiError(BAD_REQUEST, "Adjustment can only be done on settlement day"));       
     }
 
     let {
@@ -376,20 +376,20 @@ export const adjustGivenAmountOnSettlement = asyncHandler(async(req, res, next) 
     } = monthlyRecord.settlements.find(e => e.dayDate === Number(settlementDayDate));
 
     if(wagesOccured > 0){
+        //don't confuse with response it is designed that when wages occured on settlement and if you are giving money then after that according to given amount only transferred(wages and advance) amount will change the occured amount will be same
         const remainingAmount = wagesOccured - givenAmount;
         if(remainingAmount > 0){
-            wagesOccured = remainingAmount;
             wagesTransferred = remainingAmount;
             monthlyRecord.prevWages = remainingAmount;
             monthlyRecord.prevAdvance = 0;
         }else if(remainingAmount < 0){
-            advanceOccured = Math.abs(remainingAmount);
             advanceTransferred = Math.abs(remainingAmount);
+            wagesTransferred = 0;
             monthlyRecord.prevWages = 0;
             monthlyRecord.prevAdvance = Math.abs(remainingAmount);
         }else{
-            wagesOccured = 0;
-            advanceOccured = 0;;
+            wagesTransferred = 0;
+            advanceTransferred = 0;
             monthlyRecord.prevWages = 0;
             monthlyRecord.prevAdvance = 0;
         }
@@ -414,5 +414,55 @@ export const adjustGivenAmountOnSettlement = asyncHandler(async(req, res, next) 
         OK,
         "Amount adjustment on settlement success",
         {wagesOccured, advanceOccured, wagesTransferred, advanceTransferred, amountTaken}
+    ));
+});
+
+export const getAllSettlementOfMonth = asyncHandler(async(req, res, next) => {
+    const recordId = req.params?.recordId?.trim();
+    if(!recordId || typeof recordId !== "string"){
+        return next(new ApiError(BAD_REQUEST, "Invalid recordId is provided"));
+    }
+    const monthlyRecord = await MonthlyRecord.findById(recordId.trim());
+    if(!monthlyRecord){
+        return next(new ApiError(NOT_FOUND, "Record not found"));
+    }
+
+    res.status(OK).json(new ApiResponse(
+        OK,
+        "Get all settlement success",
+        monthlyRecord.settlements
+    ));
+});
+
+export const getSingleSettlement = asyncHandler(async(req, res, next) => {
+    const recordId = req.query?.recordId?.trim();
+    let dayDate = req.query?.dayDate?.trim();
+
+    if(!recordId || typeof recordId !== "string"){
+        return next(new ApiError(BAD_REQUEST, "Invalid recordId is provided"));
+    }
+    const monthlyRecord = await MonthlyRecord.findById(recordId.trim());
+    if(!monthlyRecord){
+        return next(new ApiError(NOT_FOUND, "Record not found"));
+    }
+
+    if(!dayDate || isNaN(dayDate)){
+        dayDate = monthlyRecord.lastSettlementDate?.dayDate || 0;
+    }else{
+        dayDate = Number(dayDate);
+    }
+
+    if(dayDate === 0){
+        return next(new ApiError(BAD_REQUEST, "No settlement is done in this month"));
+    }
+    const record = monthlyRecord.settlements.find(rec => rec.dayDate === dayDate);
+    if(!record){
+        return next(new ApiError(NOT_FOUND, "No settlement found for this date"));
+    }
+
+    res.status(OK).json(new ApiResponse(
+        OK,
+        "Get single settlement success",
+        record
     ));
 });
