@@ -1,0 +1,40 @@
+version: '3'
+services:
+  thekedar-server:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      - MONGO_URI=mongodb://admin:password@mongodb:27017
+
+      # these envs are for sending emails please enter your own
+      # - SMTP_HOST=smtp.gmail.com
+      # - SMTP_PORT=465
+      # - SMTP_USER=example@gmail.com
+      # - SMTP_PASS=example-password
+
+    depends_on:
+      - mongodb
+    volumes:
+      # it will bind mount your host's current directory to container /app dir hence if you change code in the host machine it will reflect in container except node_modules
+      - ./:/app:ro
+      - /app/node_modules
+    networks:
+      - thekedar-server-network
+  
+  mongodb:
+    image: mongo:7
+    volumes:
+      - thekedar-mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    ports:
+      - "27017:27017"
+    networks:
+      - thekedar-server-network
+networks:
+  thekedar-server-network:
+    driver: bridge
+volumes:
+  thekedar-mongo-data:
