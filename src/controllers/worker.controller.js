@@ -11,9 +11,11 @@ import {
     NOT_FOUND,
     OK
 } from "../constants.js";
+import {Types} from "mongoose";
+
 
 export const createWorker = asyncHandler(async(req, res, next) => {
-    const {name, role, contactNumber, wagesPerDay, address, joiningDate} = req.body;
+    const {name, role, contactNumber, wagesPerDay, address, joiningDate, numberOfDays} = req.body;
 
     if(name.trim() === "" || name === undefined || name === null){
         return next(new ApiError(BAD_REQUEST, "Name of the worker is required"));
@@ -26,6 +28,15 @@ export const createWorker = asyncHandler(async(req, res, next) => {
     if(!wagesPerDay || isNaN(Number(wagesPerDay))){
         return next(new ApiError(BAD_REQUEST, "Wages is required"));
     }
+
+    if(!numberOfDays || isNaN(Number(numberOfDays))){
+        return next(new ApiError(BAD_REQUEST, "Number of days is required"));
+    }
+
+    if(Number(numberOfDays) < 29 || Number(numberOfDays) > 32){
+        return next(new ApiError(BAD_REQUEST, "Total days in month can only be in between (29 - 32)"));
+    }
+
 
     const dateGiven = new NepaliDate(joiningDate.year, joiningDate.monthIndex, joiningDate.dayDate);
     const currentDate = new NepaliDate(new Date(Date.now()));
@@ -41,12 +52,23 @@ export const createWorker = asyncHandler(async(req, res, next) => {
         contactNumber,
         address,
         wagesPerDay:Number(wagesPerDay),
-        joiningDate
+        joiningDate,
+        currentRecordId: new Types.ObjectId()
     });
 
     if(!worker){
         return next(new ApiError(INTERNAL_SERVER_ERROR, "Something went wrong while creating worker"));
     }
+
+    const monthlyRecord = await MonthlyRecord.create({
+        workerId:worker._id,
+        year:joiningDate.year,
+        monthIndex:joiningDate.monthIndex,
+        numberOfDays:Number(numberOfDays)
+    });
+
+    worker.currentRecordId = monthlyRecord._id;
+    await worker.save();
 
     res.status(CREATED).json(new ApiResponse(CREATED, "Worker is created", worker));
 });

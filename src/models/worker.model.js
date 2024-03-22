@@ -44,6 +44,11 @@ const workerSchema = new mongoose.Schema({
     isActive:{
         type:Boolean,
         default:true
+    },
+    currentRecordId:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'MonthlyRecord',
+        required:[true, "RecordId is required for workers"],
     }
 });
 

@@ -80,6 +80,9 @@ export const createMonthlyRecord = asyncHandler(async(req, res, next) => {
         return next(new ApiError(INTERNAL_SERVER_ERROR, "Something went wrong while creating monthly record"));
     }
 
+    //to update worker current month record id
+    await Worker.findByIdAndUpdate(workerId, {currentRecordId:monthlyRecord._id});
+
     res.status(CREATED).json(new ApiResponse(CREATED, "Record is created", monthlyRecord));
 });
 
@@ -293,14 +296,23 @@ export const settleAccount = asyncHandler(async(req, res, next) => {
     const amount = (prevWages + currentWages) - (prevAdvance + currentAdvance);
 
     let settlement = {dayDate};
-    let response = {prevWages, prevAdvance, currentWages, currentAdvance, showForAdjustment : false};
+    let response = {
+        prevWages, 
+        prevAdvance, 
+        calculatedWages : currentWages, 
+        calculatedAdvance : currentAdvance, 
+        showForAdjustment : false,
+        newCurrentWages : monthlyRecord.currentWages - currentWages,
+        newCurrentAdvacnce : monthlyRecord.currentAdvance - currentAdvance,
+        amount,
+    };
     if(amount > 0){
         settlement = {
             ...settlement,
             wagesOccured:amount,
             wagesTransferred:amount
         }
-        response["wagesOccured"] = amount;
+        // response["wagesOccured"] = amount;
         response.showForAdjustment = true;
         monthlyRecord.prevWages = amount;
         monthlyRecord.prevAdvance = 0;
@@ -310,12 +322,12 @@ export const settleAccount = asyncHandler(async(req, res, next) => {
             advanceOccured:Math.abs(amount),
             advanceTransferred:Math.abs(amount)
         }
-        response["advanceOccured"] = Math.abs(amount);
+        // response["advanceOccured"] = Math.abs(amount);
         monthlyRecord.prevAdvance = Math.abs(amount);
         monthlyRecord.prevWages = 0;
     }else{
-        response["wagesOccured"] = 0;
-        response["advanceOccured"] = 0;
+        // response["wagesOccured"] = 0;
+        // response["advanceOccured"] = 0;
         monthlyRecord.prevWages = 0;
         monthlyRecord.prevAdvance = 0;
     }
