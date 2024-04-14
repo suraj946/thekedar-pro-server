@@ -2,7 +2,9 @@ import {Router} from "express";
 import { 
     changePassword, 
     forgotPassword, 
+    loadUser, 
     login, 
+    logout, 
     register, 
     resetPassword, 
     updateProfile
@@ -13,6 +15,8 @@ const router = Router();
 
 router.route("/register").post(register);
 router.route("/login").post(login);
+router.route("/loaduser").get(authenticate, loadUser);
+router.route("/logout").get(authenticate, logout);
 router.route("/updateprofile").put(authenticate, updateProfile);
 router.route("/changepassword").put(authenticate, changePassword);
 router.route("/forgotpassword").post(forgotPassword);

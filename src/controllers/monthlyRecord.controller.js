@@ -148,6 +148,89 @@ export const addAttendence = asyncHandler(async(req, res, next) => {
     res.status(OK).json(new ApiResponse(OK, "Attendence done successfully", monthlyRecord));
 });
 
+const addAttendenceSingle = async(workersData, presence, dayDate) => {
+    try {
+        const {
+            wagesOfDay,
+            advanceAmount,
+            purposeOfAdvance,
+            recordId,
+            workerName,
+            workerId
+        } = workersData;
+    
+        let monthlyRecord = await MonthlyRecord.findById(recordId);
+        if(!monthlyRecord){
+            throw new ApiError(NOT_FOUND, `Monthly record not found for ${workerName}`);
+        }
+
+        if(wagesOfDay === "" || isNaN(wagesOfDay)){
+            throw new ApiError(BAD_REQUEST, `Invalid daily wages provided for ${workerName}`);
+        }
+    
+        //check for already done 
+        let isExist = monthlyRecord.dailyRecords.findIndex(rec => rec.dayDate === Number(dayDate));
+        if(isExist !== -1){
+            throw new ApiError(BAD_REQUEST, `Attendance for ${workerName} has already been done`);
+        }
+    
+        //for getting exact name of day
+        let currDate = new NepaliDate(monthlyRecord.year, monthlyRecord.monthIndex, dayDate);
+        let record = {
+            presence:presence.trim(),
+            wagesOfDay:Number(wagesOfDay),
+            dayDate:Number(dayDate),
+            day:DAYS[currDate.getDay()]
+        }
+    
+        let advance = {};
+        if(advanceAmount){
+            console.log("In advance section");
+            if(isNaN(advanceAmount)){
+                throw new ApiError(BAD_REQUEST, `Invalid advance amount given for ${workerName}`);
+            }
+            advance["amount"] = Number(advanceAmount);
+            advance["purpose"] = purposeOfAdvance?.trim() || "General Work";
+            monthlyRecord.currentAdvance += Number(advanceAmount);
+        }
+        record = {...record, advance};
+    
+        monthlyRecord.dailyRecords.push(record);
+        monthlyRecord.currentWages += Number(wagesOfDay);
+        monthlyRecord = await monthlyRecord.save();
+    
+        return {
+            workerId,
+            isDone:true
+        }
+    } catch (error) {
+        return Promise.reject(error.message);
+    }
+}
+
+export const createAttendance = asyncHandler(async(req, res, next) => {
+    const {workersData, presence, dayDate} = req.body;
+
+    if(dayDate === "" || isNaN(dayDate)){
+        return next(new ApiError(BAD_REQUEST, "Day date is required for attendance"));
+    }
+
+    if(!["half", "present", "absent", "one-and-half"].includes(presence.trim())){
+        return next(new ApiError(BAD_REQUEST, "Invalid presence provided"));
+    }
+
+    //for future checking
+    let currDate = new NepaliDate(new Date(Date.now()));
+    if(dayDate > currDate.getDate()){
+        return next(new ApiError(BAD_REQUEST, "Date cannot be of future date"));
+    }
+
+    const allPromises = workersData.map(wd => addAttendenceSingle(wd, presence, dayDate));
+    const response = await Promise.allSettled(allPromises);
+
+    res.status(OK).json(new ApiResponse(OK, "Attendance operation completed", response));
+});
+
 export const updateAttendence = asyncHandler(async(req, res, next) => {
     const {
         dayDate,

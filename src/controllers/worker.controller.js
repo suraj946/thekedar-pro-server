@@ -1,229 +1,382 @@
-import {asyncHandler} from "../utils/asyncHandler.js";
-import {ApiError} from "../utils/ApiError.js";
-import {ApiResponse} from "../utils/ApiResponse.js";
-import {Worker} from "../models/worker.model.js";
-import {MonthlyRecord} from "../models/monthlyRecord.modal.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { Worker } from "../models/worker.model.js";
+import { MonthlyRecord } from "../models/monthlyRecord.modal.js";
 import NepaliDate from "nepali-date-converter";
 import {
-    BAD_REQUEST,
-    CREATED,
-    INTERNAL_SERVER_ERROR,
-    NOT_FOUND,
-    OK
+  BAD_REQUEST,
+  CREATED,
+  INTERNAL_SERVER_ERROR,
+  NOT_FOUND,
+  OK,
 } from "../constants.js";
-import {Types} from "mongoose";
+import { Types } from "mongoose";
 
+export const createWorker = asyncHandler(async (req, res, next) => {
+  const {
+    name,
+    role,
+    contactNumber,
+    wagesPerDay,
+    address,
+    joiningDate,
+    numberOfDays,
+  } = req.body;
 
-export const createWorker = asyncHandler(async(req, res, next) => {
-    const {name, role, contactNumber, wagesPerDay, address, joiningDate, numberOfDays} = req.body;
+  if (name.trim() === "" || name === undefined || name === null) {
+    return next(new ApiError(BAD_REQUEST, "Name of the worker is required"));
+  }
 
-    if(name.trim() === "" || name === undefined || name === null){
-        return next(new ApiError(BAD_REQUEST, "Name of the worker is required"));
-    }
+  if (!["mistri", "labour", "general"].includes(role)) {
+    return next(new ApiError(BAD_REQUEST, "Invalid role of the worker"));
+  }
 
-    if(!(["mistri", "labour", "general"].includes(role))){
-        return next(new ApiError(BAD_REQUEST, "Invalid role of the worker"));
-    }
+  if (!wagesPerDay || isNaN(Number(wagesPerDay))) {
+    return next(new ApiError(BAD_REQUEST, "Wages is required"));
+  }
 
-    if(!wagesPerDay || isNaN(Number(wagesPerDay))){
-        return next(new ApiError(BAD_REQUEST, "Wages is required"));
-    }
+  if (!numberOfDays || isNaN(Number(numberOfDays))) {
+    return next(new ApiError(BAD_REQUEST, "Number of days is required"));
+  }
 
-    if(!numberOfDays || isNaN(Number(numberOfDays))){
-        return next(new ApiError(BAD_REQUEST, "Number of days is required"));
-    }
+  if (Number(numberOfDays) < 29 || Number(numberOfDays) > 32) {
+    return next(
+      new ApiError(
+        BAD_REQUEST,
+        "Total days in month can only be in between (29 - 32)"
+      )
+    );
+  }
 
-    if(Number(numberOfDays) < 29 || Number(numberOfDays) > 32){
-        return next(new ApiError(BAD_REQUEST, "Total days in month can only be in between (29 - 32)"));
-    }
+  const dateGiven = new NepaliDate(
+    joiningDate.year,
+    joiningDate.monthIndex,
+    joiningDate.dayDate
+  );
+  const currentDate = new NepaliDate(new Date(Date.now()));
 
+  if (
+    dateGiven.getYear() > currentDate.getYear() ||
+    dateGiven.getMonth() > currentDate.getMonth() ||
+    dateGiven.getDate() > currentDate.getDate()
+  ) {
+    return next(new ApiError(BAD_REQUEST, "Invalid date provided"));
+  }
 
-    const dateGiven = new NepaliDate(joiningDate.year, joiningDate.monthIndex, joiningDate.dayDate);
-    const currentDate = new NepaliDate(new Date(Date.now()));
+  const worker = await Worker.create({
+    name,
+    role,
+    thekedarId: req.thekedar._id,
+    contactNumber,
+    address,
+    wagesPerDay: Number(wagesPerDay),
+    joiningDate,
+    currentRecordId: new Types.ObjectId(),
+  });
 
-    if((dateGiven.getYear() > currentDate.getYear()) || (dateGiven.getMonth() > currentDate.getMonth()) || (dateGiven.getDate() > currentDate.getDate())){
-        return next(new ApiError(BAD_REQUEST, "Invalid date provided"));
-    }
+  if (!worker) {
+    return next(
+      new ApiError(
+        INTERNAL_SERVER_ERROR,
+        "Something went wrong while creating worker"
+      )
+    );
+  }
 
-    const worker = await Worker.create({
-        name,
-        role,
-        thekedarId:req.thekedar._id,
-        contactNumber,
-        address,
-        wagesPerDay:Number(wagesPerDay),
-        joiningDate,
-        currentRecordId: new Types.ObjectId()
-    });
+  const monthlyRecord = await MonthlyRecord.create({
+    workerId: worker._id,
+    year: joiningDate.year,
+    monthIndex: joiningDate.monthIndex,
+    numberOfDays: Number(numberOfDays),
+  });
 
-    if(!worker){
-        return next(new ApiError(INTERNAL_SERVER_ERROR, "Something went wrong while creating worker"));
-    }
+  worker.currentRecordId = monthlyRecord._id;
+  await worker.save();
 
-    const monthlyRecord = await MonthlyRecord.create({
-        workerId:worker._id,
-        year:joiningDate.year,
-        monthIndex:joiningDate.monthIndex,
-        numberOfDays:Number(numberOfDays)
-    });
-
-    worker.currentRecordId = monthlyRecord._id;
-    await worker.save();
-
-    res.status(CREATED).json(new ApiResponse(CREATED, "Worker is created", worker));
+  res
+    .status(CREATED)
+    .json(new ApiResponse(CREATED, "Worker is created", worker));
 });
 
-export const getAllWorkers = asyncHandler(async(req, res, next) => {
-    const status = req.query.status.trim();
-    if(!(status === "false" || status === "true")){
-        return next(new ApiError(BAD_REQUEST, "Invalid status provided"));
-    }
-    const workers = await Worker.find({thekedarId:req.thekedar._id, isActive:status === "true"}).select("name role wagesPerDay");
-    res.status(OK).json(new ApiResponse(OK, "Get worker success", workers));
-})
-
-export const updateWages = asyncHandler(async(req, res, next) => {
-    const {wages, workerId} = req.body;
-
-    if(!wages || isNaN(Number(wages))){
-        return next(new ApiError(BAD_REQUEST, "Wages of the worker is required"));
-    }
-    if(workerId.trim() === "" || workerId === undefined || workerId === null){
-        return next(new ApiError(BAD_REQUEST, "Invalid worker id"));
-    }
-
-    const worker = await Worker.findOne({_id : workerId, thekedarId : req.thekedar._id});
-    if(!worker){
-        return next(new ApiError(NOT_FOUND, "Worker not found"))
-    }
-
-    worker.wagesPerDay = Number(wages);
-    await worker.save();
-
-    res.status(OK).json(new ApiResponse(OK, "Wages is updated"));
+export const getAllWorkers = asyncHandler(async (req, res, next) => {
+  const status = req.query.status.trim();
+  if (!(status === "false" || status === "true")) {
+    return next(new ApiError(BAD_REQUEST, "Invalid status provided"));
+  }
+  const workers = await Worker.find({
+    thekedarId: req.thekedar._id,
+    isActive: status === "true",
+  }).select("name role wagesPerDay");
+  res.status(OK).json(new ApiResponse(OK, "Get worker success", workers));
 });
 
-export const updateRole = asyncHandler(async(req, res, next) => {
-    const role = req.body.role.trim();
-    const workerId = req.body.workerId.trim();
+export const updateWages = asyncHandler(async (req, res, next) => {
+  const { wages, workerId } = req.body;
 
-    if(!["mistri", "general", "labour"].includes(role)){
-        return next(new ApiError(BAD_REQUEST, "Invalid role provided"));
-    }
+  if (!wages || isNaN(Number(wages))) {
+    return next(new ApiError(BAD_REQUEST, "Wages of the worker is required"));
+  }
+  if (workerId.trim() === "" || workerId === undefined || workerId === null) {
+    return next(new ApiError(BAD_REQUEST, "Invalid worker id"));
+  }
 
-    if(workerId.trim() === "" || workerId === undefined || workerId === null){
-        return next(new ApiError(BAD_REQUEST, "Invalid worker id"));
-    }
+  const worker = await Worker.findOne({
+    _id: workerId,
+    thekedarId: req.thekedar._id,
+  });
+  if (!worker) {
+    return next(new ApiError(NOT_FOUND, "Worker not found"));
+  }
 
-    const worker = await Worker.findOne({_id : workerId, thekedarId : req.thekedar._id});
-    if(!worker){
-        return next(new ApiError(NOT_FOUND, "Worker not found"))
-    }
+  worker.wagesPerDay = Number(wages);
+  await worker.save();
 
-    worker.role = role;
-    await worker.save();
-
-    res.status(OK).json(new ApiResponse(OK, "Role is updated"));
+  res.status(OK).json(new ApiResponse(OK, "Wages is updated"));
 });
 
-export const toggleActiveStatus = asyncHandler(async(req, res, next) => {
-    const workerId = req.body.workerId.trim();
-    const activeStatus = req.body.activeStatus;
+export const updateRole = asyncHandler(async (req, res, next) => {
+  const role = req.body.role.trim();
+  const workerId = req.body.workerId.trim();
 
-    if(typeof activeStatus !== "boolean"){
-        return next(new ApiError(BAD_REQUEST, "Invalid status"));
-    }
+  if (!["mistri", "general", "labour"].includes(role)) {
+    return next(new ApiError(BAD_REQUEST, "Invalid role provided"));
+  }
 
-    if(workerId.trim() === "" || workerId === undefined || workerId === null){
-        return next(new ApiError(BAD_REQUEST, "Invalid worker id"));
-    }
+  if (workerId.trim() === "" || workerId === undefined || workerId === null) {
+    return next(new ApiError(BAD_REQUEST, "Invalid worker id"));
+  }
 
-    const worker = await Worker.findOne({thekedarId:req.thekedar._id, _id:workerId});
-    if(!worker){
-        return next(new ApiError(NOT_FOUND, "Worker not found "));
-    }
+  const worker = await Worker.findOne({
+    _id: workerId,
+    thekedarId: req.thekedar._id,
+  });
+  if (!worker) {
+    return next(new ApiError(NOT_FOUND, "Worker not found"));
+  }
 
-    worker.isActive = activeStatus;
-    await worker.save();
+  worker.role = role;
+  await worker.save();
 
-    res.status(OK).json(new ApiResponse(OK, "Active status is updated"));
+  res.status(OK).json(new ApiResponse(OK, "Role is updated"));
 });
 
-export const updateWorker = asyncHandler(async(req, res, next) => {
-    const {name, contactNumber, address, role, wagesPerDay} = req.body;
-    const workerId = req.params?.workerId.trim();
+export const toggleActiveStatus = asyncHandler(async (req, res, next) => {
+  const workerId = req.body.workerId.trim();
+  const activeStatus = req.body.activeStatus;
 
-    const worker = await Worker.findOne({_id:workerId, thekedarId:req.thekedar._id});
+  if (typeof activeStatus !== "boolean") {
+    return next(new ApiError(BAD_REQUEST, "Invalid status"));
+  }
 
-    if(!worker){
-        return next(new ApiError(NOT_FOUND, "Worker not found"));
-    }
+  if (workerId.trim() === "" || workerId === undefined || workerId === null) {
+    return next(new ApiError(BAD_REQUEST, "Invalid worker id"));
+  }
 
-    if(name){
-        worker.name = name.trim();
-    }
+  const worker = await Worker.findOne({
+    thekedarId: req.thekedar._id,
+    _id: workerId,
+  });
+  if (!worker) {
+    return next(new ApiError(NOT_FOUND, "Worker not found "));
+  }
 
-    if(contactNumber){
-        worker.contactNumber = contactNumber.trim();
-    }
+  worker.isActive = activeStatus;
+  await worker.save();
 
-    if(address){
-        worker.address = address.trim();
-    }
-
-    if(role){
-        const roleTemp = role.trim();
-        if(!["mistri", "labour", "general"].includes(roleTemp)){
-            return next(new ApiError(BAD_REQUEST, "Invalid role or the worker"))
-        }
-        worker.role = roleTemp;
-    }
-
-    if(wagesPerDay){
-        if(isNaN(wagesPerDay)){
-            return next(new ApiError(BAD_REQUEST, "Invalid wages provided"))
-        }
-        worker.wagesPerDay = Number(wagesPerDay);
-    }
-
-    await worker.save();
-
-    res.status(OK).json(new ApiResponse(OK, "Worker is updated", worker));
+  res.status(OK).json(new ApiResponse(OK, "Active status is updated"));
 });
 
-export const getWokerDetails = asyncHandler(async(req, res, next) => {
-    const workerId = req.params?.workerId.trim();
+export const updateWorker = asyncHandler(async (req, res, next) => {
+  const { name, contactNumber, address, role, wagesPerDay } = req.body;
+  const workerId = req.params?.workerId.trim();
 
-    const worker = await Worker.findOne({_id:workerId, thekedarId:req.thekedar._id});
-    if(!worker){
-        return next(new ApiError(NOT_FOUND, "Worker not found"));
+  const worker = await Worker.findOne({
+    _id: workerId,
+    thekedarId: req.thekedar._id,
+  });
+
+  if (!worker) {
+    return next(new ApiError(NOT_FOUND, "Worker not found"));
+  }
+
+  if (name) {
+    worker.name = name.trim();
+  }
+
+  if (contactNumber) {
+    worker.contactNumber = contactNumber.trim();
+  }
+
+  if (address) {
+    worker.address = address.trim();
+  }
+
+  if (role) {
+    const roleTemp = role.trim();
+    if (!["mistri", "labour", "general"].includes(roleTemp)) {
+      return next(new ApiError(BAD_REQUEST, "Invalid role or the worker"));
     }
+    worker.role = roleTemp;
+  }
 
-    const {year, month} = new NepaliDate(new Date(Date.now())).getBS();
-    const currentMonthRecord = await MonthlyRecord.findOne({workerId:worker._id, year, monthIndex:month});
+  if (wagesPerDay) {
+    if (isNaN(wagesPerDay)) {
+      return next(new ApiError(BAD_REQUEST, "Invalid wages provided"));
+    }
+    worker.wagesPerDay = Number(wagesPerDay);
+  }
 
-    res.status(OK).json(new ApiResponse(
-        OK,
-        "Get worker details success",
-        {worker, currentMonthRecord}
-    ));
+  await worker.save();
+
+  res.status(OK).json(new ApiResponse(OK, "Worker is updated", worker));
 });
 
-export const deleteWorker = asyncHandler(async(req, res, next) => {
-    const workerId = req.params?.workerId.trim();
-    const worker = await Worker.findOne({_id:workerId, thekedarId:req.thekedar._id});
+export const getWokerDetails = asyncHandler(async (req, res, next) => {
+  const workerId = req.params?.workerId.trim();
 
-    if(!worker){
-        return next(new ApiError(NOT_FOUND, "Worker not found"));
+  const worker = await Worker.aggregate([
+    {
+      $match: {
+        $and: [
+          {
+            _id: new Types.ObjectId(workerId),
+          },
+          {
+            thekedarId: new Types.ObjectId(req.thekedar?._id),
+          },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "monthlyrecords",
+        localField: "currentRecordId",
+        foreignField: "_id",
+        as: "monthRecord",
+        pipeline: [
+          {
+            $project: {
+              prevWages: 1,
+              currentWages: 1,
+              prevAdvance: 1,
+              currentAdvance: 1,
+              lastSettlementDate: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        monthRecord: {
+          $first: "$monthRecord",
+        },
+      },
+    },
+    {
+      $project: {
+        thekedarId: 0,
+        currentRecordId: 0,
+      },
     }
+  ]);
 
-    try {
-        await MonthlyRecord.deleteMany({workerId:worker._id});
-        await worker.deleteOne();
-        return res.status(OK).json(new ApiResponse(OK, "Worker deleted successfully"))
-    } catch (error) {
-        console.log(error);
-        return next(new ApiError(INTERNAL_SERVER_ERROR, "Something went wrong while deleting the worker"));
-    }
-    // TODO : Test this api after creating monthly record
-})
+  res
+    .status(OK)
+    .json(new ApiResponse(OK, "Get worker details success", worker[0]));
+});
+
+export const deleteWorker = asyncHandler(async (req, res, next) => {
+  const workerId = req.params?.workerId.trim();
+  const worker = await Worker.findOne({
+    _id: workerId,
+    thekedarId: req.thekedar._id,
+  });
+
+  if (!worker) {
+    return next(new ApiError(NOT_FOUND, "Worker not found"));
+  }
+
+  try {
+    await MonthlyRecord.deleteMany({ workerId: worker._id });
+    await worker.deleteOne();
+    return res
+      .status(OK)
+      .json(new ApiResponse(OK, "Worker deleted successfully"));
+  } catch (error) {
+    console.log(error);
+    return next(
+      new ApiError(
+        INTERNAL_SERVER_ERROR,
+        "Something went wrong while deleting the worker"
+      )
+    );
+  }
+  // TODO : Test this api after creating monthly record
+});
+
+export const getWorkerForAttendance = asyncHandler(async (req, res, next) => {
+  const dayDate = new NepaliDate().getDate();
+  const workers = await Worker.aggregate([
+    {
+      $match: {
+        thekedarId: new Types.ObjectId(req.thekedar?._id),
+      },
+    },
+    {
+      $lookup: {
+        from: "monthlyrecords",
+        localField: "currentRecordId",
+        foreignField: "_id",
+        as: "records",
+        pipeline: [
+          {
+            $project: {
+              dailyRecords: 1,
+              _id: 0,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        records: {
+          $first: "$records",
+        },
+      },
+    },
+    {
+      $match: {
+        $expr: {
+          $eq: [
+            {
+              $size: {
+                $filter: {
+                  input: "$records.dailyRecords",
+                  cond: {
+                    $gte: ["$$this.dayDate", dayDate],
+                  },
+                },
+              },
+            },
+            0,
+          ],
+        },
+      },
+    },
+    {
+      $project: {
+        records: 0,
+        isActive: 0,
+        thekedarId: 0,
+        joiningDate: 0,
+        address: 0,
+        contactNumber: 0,
+      },
+    },
+  ]);
+
+  res.status(OK).json(new ApiResponse(OK, "Get worker success", workers));
+});

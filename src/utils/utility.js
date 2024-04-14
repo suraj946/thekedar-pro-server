@@ -3,17 +3,24 @@ import { ApiResponse } from "./ApiResponse.js";
 
 export const sendToken = async(thekedar, statusCode, res, message) => {
   const jwtToken = await thekedar.generateJWTToken();
-
+  thekedar["password"] = undefined;
   res
     .status(statusCode)
     .cookie("token", jwtToken, {
+      ...cookieOptions(),
       expires: new Date(
         Date.now() + process.env.COOKIE_EXPIRE_DAY * 24 * 60 * 60 * 1000
       ),
-      httpOnly: true,
     })
     .json(new ApiResponse(statusCode, message, thekedar));
 };
+
+
+export const cookieOptions = () => ({
+  secure: (process.env.NODE_ENV === "development") ? false : true,
+  httpOnly: (process.env.NODE_ENV === "development") ? false : true,
+  sameSite: (process.env.NODE_ENV === "development") ? false : "none",
+});
 
 export const sendEmail = async ({toEmail, subject, otp, heading, description}) => {
   const transporter = createTransport({

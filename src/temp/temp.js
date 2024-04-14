@@ -1,5 +1,7 @@
-import {Types} from "mongoose";
-import NepaliDate from "nepali-date-converter";
+// import {Types} from "mongoose";
+// import NepaliDate from "nepali-date-converter";
+
+import { ApiError } from "../utils/ApiError.js";
 
 // const date = new NepaliDate(2080, 8, 29);
 // const day = date.format("ddd D").split(" ");
@@ -147,3 +149,58 @@ import NepaliDate from "nepali-date-converter";
 // const objId = new Types.ObjectId()
 
 // console.log(new Types.ObjectId());
+
+
+const forSingle = async(name, email, i) => {
+  try {
+    if(!name){
+      throw new ApiError(401, "name is required", {id:i});
+    }
+  
+    if(!email){
+      throw new ApiError(401, "email is required", {id:i});
+    }
+  
+    return await Promise.resolve({success:true});
+  } catch (error) {
+    return Promise.reject({
+      error:error.message,
+      info:{...error.data}
+    })
+  }
+}
+
+const done = async() => {
+  const data = [
+    {
+      name:"",
+      email:"s@gmail.com"
+    },
+    {
+      name:"Ramesh",
+      email:"r@gmail.com"
+    },
+    {
+      name:"Puja",
+      email:"p@gmail.com"
+    },
+    {
+      name:"Avishek",
+      email:"a@gmail.com"
+    },
+  ];
+
+  const allPromises = [];
+  data.forEach((d, idx) => {
+    allPromises.push(forSingle(d.name, d.email, idx));
+  });
+
+  const res = await Promise.allSettled(allPromises);
+  res.forEach(r => {
+    if(r.status === "rejected"){
+      console.log(r.reason?.info);
+    }
+  })
+}
+
+done();

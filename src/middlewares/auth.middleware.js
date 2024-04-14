@@ -5,7 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 
 export const authenticate = asyncHandler(async(req, res, next)=>{
-    const {token} = req.cookies;
+    const token = req.cookies?.token || req.headers?.authorization?.split(" ")[1];
     if(!token){
         return next(new ApiError(UNAUTHORIZED, "Please login to access this resources"));
     }

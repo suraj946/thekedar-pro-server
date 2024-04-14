@@ -5,6 +5,7 @@ import {
     deleteWorker, 
     getAllWorkers, 
     getWokerDetails, 
+    getWorkerForAttendance, 
     toggleActiveStatus, 
     updateRole, 
     updateWages, 
@@ -23,5 +24,7 @@ router.route("/single/:workerId")
       .put(authenticate, updateWorker)
       .get(authenticate, getWokerDetails)
       .delete(authenticate, deleteWorker);
+
+router.route("/get-worker-for-attendance").get(authenticate, getWorkerForAttendance);
 
 export default router;

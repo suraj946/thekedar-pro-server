@@ -11,6 +11,7 @@ import {
     OK, 
     UNAUTHORIZED
 } from "../constants.js";
+import {cookieOptions} from "../utils/utility.js";
 
 export const register = asyncHandler(async(req, res, next) => {
     const {name, email, password, contactNumber, address, companyName} = req.body;
@@ -56,6 +57,16 @@ export const login = asyncHandler(async (req, res, next) => {
     }
 
     sendToken(thekedar, OK, res, `Welcome back ${thekedar.name}`);
+});
+
+export const logout = asyncHandler(async(req, res, next) => {
+    res
+        .status(OK)
+        .cookie("token", "", {
+            ...cookieOptions(),
+            expires: new Date(Date.now()),
+        })
+        .json(new ApiResponse(OK, "Logout success"));
 });
 
 export const updateProfile = asyncHandler(async (req, res, next) => {
@@ -154,4 +165,8 @@ export const resetPassword = asyncHandler(async(req, res, next) => {
     await thekedar.save();
 
     res.status(OK).json(new ApiResponse(OK, "Your password is reset, you can login now"));
+});
+
+export const loadUser = asyncHandler(async(req, res, next) => {
+    res.status(OK).json(new ApiResponse(OK, "Load user success", req.thekedar));
 })

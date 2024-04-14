@@ -3,6 +3,7 @@ import {authenticate} from "../middlewares/auth.middleware.js";
 import { 
     addAttendence, 
     adjustGivenAmountOnSettlement, 
+    createAttendance, 
     createMonthlyRecord, 
     deleteAttendence, 
     getAllRecordsOfYear, 
@@ -20,6 +21,8 @@ router.route("/attendence/:recordId")
       .post(authenticate, addAttendence)
       .put(authenticate, updateAttendence)
       .delete(authenticate, deleteAttendence);
+
+router.route("/create-attendance").post(authenticate, createAttendance);
 
 router.route("/single/:recordId")
       .get(authenticate, getMonthlyRecord);
