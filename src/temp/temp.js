@@ -1,7 +1,9 @@
 // import {Types} from "mongoose";
 // import NepaliDate from "nepali-date-converter";
 
+import NepaliDate from "nepali-date-converter";
 import { ApiError } from "../utils/ApiError.js";
+import { getCurrentNepaliDate } from "../utils/utility.js";
 
 // const date = new NepaliDate(2080, 8, 29);
 // const day = date.format("ddd D").split(" ");
@@ -151,56 +153,101 @@ import { ApiError } from "../utils/ApiError.js";
 // console.log(new Types.ObjectId());
 
 
-const forSingle = async(name, email, i) => {
-  try {
-    if(!name){
-      throw new ApiError(401, "name is required", {id:i});
-    }
+// const forSingle = async(name, email, i) => {
+//   try {
+//     if(!name){
+//       throw new ApiError(401, "name is required", {id:i});
+//     }
   
-    if(!email){
-      throw new ApiError(401, "email is required", {id:i});
-    }
+//     if(!email){
+//       throw new ApiError(401, "email is required", {id:i});
+//     }
   
-    return await Promise.resolve({success:true});
-  } catch (error) {
-    return Promise.reject({
-      error:error.message,
-      info:{...error.data}
-    })
-  }
-}
+//     return await Promise.resolve({success:true});
+//   } catch (error) {
+//     return Promise.reject({
+//       error:error.message,
+//       info:{...error.data}
+//     })
+//   }
+// }
 
-const done = async() => {
-  const data = [
-    {
-      name:"",
-      email:"s@gmail.com"
-    },
-    {
-      name:"Ramesh",
-      email:"r@gmail.com"
-    },
-    {
-      name:"Puja",
-      email:"p@gmail.com"
-    },
-    {
-      name:"Avishek",
-      email:"a@gmail.com"
-    },
-  ];
+// const done = async() => {
+//   const data = [
+//     {
+//       name:"",
+//       email:"s@gmail.com"
+//     },
+//     {
+//       name:"Ramesh",
+//       email:"r@gmail.com"
+//     },
+//     {
+//       name:"Puja",
+//       email:"p@gmail.com"
+//     },
+//     {
+//       name:"Avishek",
+//       email:"a@gmail.com"
+//     },
+//   ];
 
-  const allPromises = [];
-  data.forEach((d, idx) => {
-    allPromises.push(forSingle(d.name, d.email, idx));
-  });
+//   const allPromises = [];
+//   data.forEach((d, idx) => {
+//     allPromises.push(forSingle(d.name, d.email, idx));
+//   });
 
-  const res = await Promise.allSettled(allPromises);
-  res.forEach(r => {
-    if(r.status === "rejected"){
-      console.log(r.reason?.info);
-    }
-  })
-}
+//   const res = await Promise.allSettled(allPromises);
+//   res.forEach(r => {
+//     if(r.status === "rejected"){
+//       console.log(r.reason?.info);
+//     }
+//   })
+// }
 
-done();
+// done();
+
+
+
+// const worker = {
+//   _id: '657af5a169a5a97d9cbfe5a4',
+//   name: 'Ramesh Sah',
+//   role: 'mistri',
+//   thekedarId: '6572c79483f62bcfc1700020',
+//   contactNumber: '9855641256',
+//   address: 'Bariyarpur',
+//   wagesPerDay: 1000,
+
+//   joiningDate: {
+//     year: 2080,
+//     monthIndex: 7,
+//     dayDate: 28,
+//   },
+//   isActive: true,
+//   currentRecords: {
+//     _id: {
+//       $oid: '6580213607cceaf29f59d0e9',
+//     },
+//     prevAdvance: 0,
+//     workerId: {
+//       $oid: '657af5a169a5a97d9cbfe5a4',
+//     },
+//     lastSettlementDate: {
+//       dayName: 'monday',
+//       dayDate: 16,
+//     },
+//     __v: 35,
+//     year: 2080,
+//     monthIndex: 8,
+//     prevWages: 0,
+//     currentWages: 0,
+//     currentAdvance: 0,
+//     numberOfDays: 29,
+//   },
+// };
+
+
+const d1 = getCurrentNepaliDate().dayDate;
+const d2 = new NepaliDate(new Date(Date.now())).getDate();
+
+console.log({d1, d2});

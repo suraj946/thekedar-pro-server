@@ -1,5 +1,30 @@
 import { createTransport } from "nodemailer";
 import { ApiResponse } from "./ApiResponse.js";
+import NepaliDate from "nepali-date-converter";
+
+export const getCurrentNepaliDate = () => {
+  const {year, month, date, day} = new NepaliDate().getDateObject().BS;
+  return {
+    year,
+    monthIndex:month,
+    dayDate:date,
+    dayIndex:day
+  }
+}
+
+export const isMonthChanged = (runningDate) => {
+  const {monthIndex, year} = getCurrentNepaliDate();
+  const {year:runningYear, monthIndex:runningMonthIndex} = runningDate;
+  let isInitialCall;
+
+  if((year === runningYear && monthIndex - runningMonthIndex > 0) || year > runningYear){
+    isInitialCall = true;
+  }else{
+    isInitialCall = false;
+  }
+
+  return isInitialCall;
+}
 
 export const sendToken = async(thekedar, statusCode, res, message) => {
   const jwtToken = await thekedar.generateJWTToken();
@@ -12,7 +37,10 @@ export const sendToken = async(thekedar, statusCode, res, message) => {
         Date.now() + process.env.COOKIE_EXPIRE_DAY * 24 * 60 * 60 * 1000
       ),
     })
-    .json(new ApiResponse(statusCode, message, thekedar));
+    .json(new ApiResponse(statusCode, message, {
+      thekedar,
+      isInitialCall: isMonthChanged(thekedar.runningDate),
+    }));
 };
 
 

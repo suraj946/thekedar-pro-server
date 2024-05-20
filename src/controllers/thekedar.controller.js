@@ -2,7 +2,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import {ApiError} from "../utils/ApiError.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import { Thekedar } from "../models/thekedar.model.js";
-import { sendEmail, sendToken } from "../utils/utility.js";
+import { Worker } from "../models/worker.model.js";
+import { getCurrentNepaliDate, isMonthChanged, sendEmail, sendToken } from "../utils/utility.js";
 import { 
     BAD_REQUEST, 
     CREATED, 
@@ -12,6 +13,7 @@ import {
     UNAUTHORIZED
 } from "../constants.js";
 import {cookieOptions} from "../utils/utility.js";
+import { Types } from "mongoose";
 
 export const register = asyncHandler(async(req, res, next) => {
     const {name, email, password, contactNumber, address, companyName} = req.body;
@@ -24,6 +26,7 @@ export const register = asyncHandler(async(req, res, next) => {
     if(thekedar){
         return next(new ApiError(BAD_REQUEST, "This email is already taken"));
     }
+    const {year, monthIndex} = getCurrentNepaliDate();
 
     thekedar = await Thekedar.create({
         name,
@@ -31,7 +34,8 @@ export const register = asyncHandler(async(req, res, next) => {
         password,
         companyName,
         contactNumber,
-        address
+        address,
+        runningDate: {year, monthIndex}
     });
 
     const createdThekedar = await Thekedar.findById(thekedar._id).select("-password");
@@ -168,5 +172,71 @@ export const resetPassword = asyncHandler(async(req, res, next) => {
 });
 
 export const loadUser = asyncHandler(async(req, res, next) => {
-    res.status(OK).json(new ApiResponse(OK, "Load user success", req.thekedar));
-})
+    const thekedar = req.thekedar;
+    let isInitialCall = isMonthChanged(thekedar.runningDate);
+    res.status(OK).json(new ApiResponse(OK, "Load user success", {
+        isInitialCall,
+        thekedar
+    }));
+});
+
+export const newMonthArrival = asyncHandler(async(req, res, next) => {
+    const thekedar = await Thekedar.findById(req.thekedar._id);
+    if(!thekedar){
+        return next(new ApiError(INTERNAL_SERVER_ERROR, "Something went wrong"));
+    }
+    const {monthIndex, year} = getCurrentNepaliDate();
+    const {year:runningYear, monthIndex:runningMonthIndex} = thekedar.runningDate;
+
+    let isInitialCall;
+    let yearToSet = runningYear;
+    if(year === runningYear && monthIndex - runningMonthIndex > 0){
+        isInitialCall = true;
+    }else if(year > runningYear){
+        isInitialCall = true;
+        yearToSet = year;
+    }else{
+        isInitialCall = false;
+    }
+
+    if(isInitialCall){
+        const response = await Worker.updateMany(
+            {
+                thekedarId:thekedar._id,
+                isActive:true
+            },
+            {
+                $set:{
+                    currentRecordId : null
+                }
+            }
+        );
+        thekedar.runningDate = {
+            year:yearToSet,
+            monthIndex:monthIndex
+        };
+        await thekedar.save();
+        console.log(response);
+    }
+
+    const workers = await Worker.aggregate([
+        {
+            $match:{
+                $and:[
+                    {thekedarId: new Types.ObjectId(thekedar._id)},
+                    {isActive:true},
+                    {currentRecordId:null}
+                ]
+            }
+        },
+        {
+            $project:{
+                thekedarId:0,
+                contactNumber:0,
+                address:0,
+                joiningDate:0,
+            }
+        }
+    ]);
+    res.status(OK).json(new ApiResponse(OK, "New month arrival success", {workers, isInitialCall:true}));
+});

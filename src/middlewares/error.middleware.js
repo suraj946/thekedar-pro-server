@@ -7,6 +7,11 @@ export const error = (err, req, res, next) => {
         err.message = `Invalid object id given`
     }
 
+    if(err.name === "ValidationError"){
+        err.statusCode = 400;
+        err.message = err.message
+    }
+
     res.status(err.statusCode).json({
         success:false,
         statusCode:err.statusCode,

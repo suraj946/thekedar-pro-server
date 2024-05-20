@@ -12,6 +12,7 @@ import {
   OK,
 } from "../constants.js";
 import { Types } from "mongoose";
+import { getCurrentNepaliDate } from "../utils/utility.js";
 
 export const createWorker = asyncHandler(async (req, res, next) => {
   const {
@@ -104,13 +105,91 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
   if (!(status === "false" || status === "true")) {
     return next(new ApiError(BAD_REQUEST, "Invalid status provided"));
   }
-  const workers = await Worker.find({
-    thekedarId: req.thekedar._id,
-    isActive: status === "true",
-  }).select("name role wagesPerDay");
+  // const workers = await Worker.find({
+  //   thekedarId: req.thekedar._id,
+  //   isActive: status === "true",
+  // }).select("name role wagesPerDay");
+
+  const workers = await Worker.aggregate([
+    {
+      $match: {
+        $and: [
+          { thekedarId: new Types.ObjectId(req.thekedar._id) },
+          { isActive: status === "true" },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "monthlyrecords",
+        localField: "currentRecordId",
+        foreignField: "_id",
+        as: "records",
+        pipeline: [
+          {
+            $project: {
+              _id:0,
+              numberOfDays: 1,
+              lastSettlementDate: {
+                $cond: {
+                  if: {
+                    $eq: [{ $type: "$lastSettlementDate" }, "missing"],
+                  },
+                  then: 0,
+                  else: "$lastSettlementDate.dayDate",
+                },
+              },
+              dailyRecords: {
+                $size: "$dailyRecords",
+              },
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        records: {
+          $first: "$records",
+        },
+      },
+    },
+    {
+      $addFields: {
+        readyForSettlement: {
+          $cond: {
+            if: {
+              $eq: [
+                {
+                  $and: [
+                    { $gt: ["$records.dailyRecords", 0] },
+                    { $lt: ["$records.lastSettlementDate", getCurrentNepaliDate().dayDate] },
+                  ],
+                },
+                true,
+              ],
+            },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        name: 1,
+        role: 1,
+        wagesPerDay: 1,
+        readyForSettlement: 1,
+        records: 1,
+        currentRecordId:1
+      },
+    },
+  ]);
   res.status(OK).json(new ApiResponse(OK, "Get worker success", workers));
 });
 
+//this is handled by the updateWorker api
 export const updateWages = asyncHandler(async (req, res, next) => {
   const { wages, workerId } = req.body;
 
@@ -135,6 +214,7 @@ export const updateWages = asyncHandler(async (req, res, next) => {
   res.status(OK).json(new ApiResponse(OK, "Wages is updated"));
 });
 
+//this is handled by the updateWorker api
 export const updateRole = asyncHandler(async (req, res, next) => {
   const role = req.body.role.trim();
   const workerId = req.body.workerId.trim();
@@ -181,6 +261,11 @@ export const toggleActiveStatus = asyncHandler(async (req, res, next) => {
     return next(new ApiError(NOT_FOUND, "Worker not found "));
   }
 
+  if (worker.isActive === activeStatus) {
+    return next(new ApiError(BAD_REQUEST, "Worker is already active"));
+  }
+
+  worker.currentRecordId = null;
   worker.isActive = activeStatus;
   await worker.save();
 
@@ -189,7 +274,7 @@ export const toggleActiveStatus = asyncHandler(async (req, res, next) => {
 
 export const updateWorker = asyncHandler(async (req, res, next) => {
   const { name, contactNumber, address, role, wagesPerDay } = req.body;
-  const workerId = req.params?.workerId.trim();
+  const workerId = req.params?.workerId?.trim();
 
   const worker = await Worker.findOne({
     _id: workerId,
@@ -229,7 +314,7 @@ export const updateWorker = asyncHandler(async (req, res, next) => {
 
   await worker.save();
 
-  res.status(OK).json(new ApiResponse(OK, "Worker is updated", worker));
+  res.status(OK).json(new ApiResponse(OK, "Worker is updated"));
 });
 
 export const getWokerDetails = asyncHandler(async (req, res, next) => {
@@ -279,41 +364,72 @@ export const getWokerDetails = asyncHandler(async (req, res, next) => {
         thekedarId: 0,
         currentRecordId: 0,
       },
-    }
+    },
   ]);
+
+  if (worker.length === 0) {
+    return next(new ApiError(NOT_FOUND, "Worker not found"));
+  }
 
   res
     .status(OK)
     .json(new ApiResponse(OK, "Get worker details success", worker[0]));
 });
 
-export const deleteWorker = asyncHandler(async (req, res, next) => {
-  const workerId = req.params?.workerId.trim();
-  const worker = await Worker.findOne({
-    _id: workerId,
-    thekedarId: req.thekedar._id,
-  });
-
-  if (!worker) {
-    return next(new ApiError(NOT_FOUND, "Worker not found"));
-  }
-
+const deleteOneWorker = async (workerId, thekedarId) => {
   try {
+    const worker = await Worker.findOne({
+      _id: workerId,
+      thekedarId,
+    });
+
+    if (!worker) {
+      return Promise.reject("Worker not found for deletion");
+    }
+
     await MonthlyRecord.deleteMany({ workerId: worker._id });
     await worker.deleteOne();
-    return res
-      .status(OK)
-      .json(new ApiResponse(OK, "Worker deleted successfully"));
+    return {
+      message: "deleted",
+      workerId,
+    };
   } catch (error) {
-    console.log(error);
-    return next(
-      new ApiError(
-        INTERNAL_SERVER_ERROR,
-        "Something went wrong while deleting the worker"
-      )
-    );
+    let message = error.message;
+    if (error.name === "CastError" && error.kind === "ObjectId") {
+      message = "Invalid worker id provided for deletion";
+    }
+    return Promise.reject(message);
   }
-  // TODO : Test this api after creating monthly record
+};
+export const deleteWorkerMultiple = asyncHandler(async (req, res, next) => {
+  const workerIds = req.body?.workerIds;
+  if (!workerIds || workerIds.length === 0) {
+    return next(new ApiError(BAD_REQUEST, "No worker ids provided"));
+  }
+  const batch = [];
+  const temp = [];
+  for (let i = 0; i < workerIds.length; i++) {
+    temp.push(workerIds[i]);
+    if (temp.length === 10 || i === workerIds.length - 1) {
+      batch.push([...temp]);
+      temp.length = 0;
+    }
+  }
+
+  const response = [];
+  for (let i = 0; i < batch.length; i++) {
+    if (batch[i].length > 0) {
+      const promises = batch[i].map((workerId) =>
+        deleteOneWorker(workerId, req.thekedar._id)
+      );
+      const results = await Promise.allSettled(promises);
+      response.push(...results);
+    }
+  }
+
+  res
+    .status(OK)
+    .json(new ApiResponse(OK, "Worker delete operation success", response));
 });
 
 export const getWorkerForAttendance = asyncHandler(async (req, res, next) => {
@@ -321,7 +437,10 @@ export const getWorkerForAttendance = asyncHandler(async (req, res, next) => {
   const workers = await Worker.aggregate([
     {
       $match: {
-        thekedarId: new Types.ObjectId(req.thekedar?._id),
+        $and: [
+          { thekedarId: new Types.ObjectId(req.thekedar?._id) },
+          { isActive: true },
+        ],
       },
     },
     {
@@ -353,12 +472,17 @@ export const getWorkerForAttendance = asyncHandler(async (req, res, next) => {
           $eq: [
             {
               $size: {
-                $filter: {
-                  input: "$records.dailyRecords",
-                  cond: {
-                    $gte: ["$$this.dayDate", dayDate],
+                $ifNull: [
+                  {
+                    $filter: {
+                      input: "$records.dailyRecords",
+                      cond: {
+                        $gte: ["$$this.dayDate", dayDate],
+                      },
+                    },
                   },
-                },
+                  ["ok"],
+                ],
               },
             },
             0,

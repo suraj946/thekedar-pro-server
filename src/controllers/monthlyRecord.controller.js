@@ -12,7 +12,7 @@ import {
     DAYS 
 } from "../constants.js";
 import NepaliDate from "nepali-date-converter";
-import { calculateAmounts } from "../utils/utility.js";
+import { calculateAmounts, getCurrentNepaliDate } from "../utils/utility.js";
 
 export const createMonthlyRecord = asyncHandler(async(req, res, next) => {
     const {
@@ -86,6 +86,7 @@ export const createMonthlyRecord = asyncHandler(async(req, res, next) => {
     res.status(CREATED).json(new ApiResponse(CREATED, "Record is created", monthlyRecord));
 });
 
+//handled by multiple createAttendance
 export const addAttendence = asyncHandler(async(req, res, next) => {
     const {
         dayDate, 
@@ -161,20 +162,19 @@ const addAttendenceSingle = async(workersData, presence, dayDate) => {
     
         let monthlyRecord = await MonthlyRecord.findById(recordId);
         if(!monthlyRecord){
-            throw new ApiError(NOT_FOUND, `Monthly record not found for ${workerName}`);
+            return Promise.reject(`Monthly record not found for ${workerName}`);
         }
 
         if(wagesOfDay === "" || isNaN(wagesOfDay)){
-            throw new ApiError(BAD_REQUEST, `Invalid daily wages provided for ${workerName}`);
+            return Promise.reject(`Invalid daily wages provided for ${workerName}`);
         }
     
         //check for already done 
         let isExist = monthlyRecord.dailyRecords.findIndex(rec => rec.dayDate === Number(dayDate));
         if(isExist !== -1){
-            throw new ApiError(BAD_REQUEST, `Attendance for ${workerName} has already been done`);
+            return Promise.reject(`Attendance for ${workerName} has already been done`);
         }
     
-        //for getting exact name of day
         let currDate = new NepaliDate(monthlyRecord.year, monthlyRecord.monthIndex, dayDate);
         let record = {
             presence:presence.trim(),
@@ -185,9 +185,8 @@ const addAttendenceSingle = async(workersData, presence, dayDate) => {
     
         let advance = {};
         if(advanceAmount){
-            console.log("In advance section");
             if(isNaN(advanceAmount)){
-                throw new ApiError(BAD_REQUEST, `Invalid advance amount given for ${workerName}`);
+                return Promise.reject(`Invalid advance amount given for ${workerName}`);
             }
             advance["amount"] = Number(advanceAmount);
             advance["purpose"] = purposeOfAdvance?.trim() || "General Work";
@@ -225,8 +224,27 @@ export const createAttendance = asyncHandler(async(req, res, next) => {
         return next(new ApiError(BAD_REQUEST, "Date cannot be of future date"));
     }
 
-    const allPromises = workersData.map(wd => addAttendenceSingle(wd, presence, dayDate));
-    const response = await Promise.allSettled(allPromises);
+    const batch = [];
+    const temp = [];
+    for(let i = 0; i < workersData.length; i++){
+        temp.push(workersData[i]);
+        if(temp.length === 10 || i === workersData.length - 1){
+            batch.push([...temp]);
+            temp.length = 0;
+        }
+    }
+
+    const response = [];
+    for(let i = 0; i < batch.length; i++){
+        if(batch[i].length > 0){
+            const promises = batch[i].map(wd => addAttendenceSingle(wd, presence, dayDate));
+            const results = await Promise.allSettled(promises);
+            response.push(...results);
+        }
+    }
+
+    // const allPromises = workersData.map(wd => addAttendenceSingle(wd, presence, dayDate));
+    // const response = await Promise.allSettled(allPromises);
 
     res.status(OK).json(new ApiResponse(OK, "Attendance operation completed", response));
 });
@@ -368,7 +386,7 @@ export const settleAccount = asyncHandler(async(req, res, next) => {
     if(!(dayDate <= monthlyRecord.numberOfDays && dayDate > lastSettlementDate)){
         return next(new ApiError(BAD_REQUEST, "Invalid date given for settlement"));
     }
-    const todayDate = new NepaliDate(new Date(Date.now())).getDate();
+    // const todayDate = new NepaliDate(new Date(Date.now())).getDate();
     if(dayDate > todayDate){
         return next(new ApiError(BAD_REQUEST, "Settlement cannot be done for future dates"));
     }
@@ -561,3 +579,27 @@ export const getSingleSettlement = asyncHandler(async(req, res, next) => {
         record
     ));
 });
+
+export const checkAttendanceForToday = asyncHandler(async(req, res, next) => {
+    const recordId = req.params?.recordId?.trim();
+    if(!recordId || typeof recordId !== "string"){
+        return next(new ApiError(BAD_REQUEST, "Invalid recordId is provided"));
+    }
+    const monthlyRecord = await MonthlyRecord.findById(recordId);
+    if(!monthlyRecord){
+        return next(new ApiError(NOT_FOUND, "Record not found"));
+    }
+    let isDone = false;
+    const todayDate = getCurrentNepaliDate().dayDate;
+    monthlyRecord.dailyRecords.forEach(rec => {
+        if(rec.dayDate === todayDate){
+            isDone = true;
+        }
+    });
+
+    res.status(OK).json(new ApiResponse(
+        OK,
+        "Attendance check success",
+        {isDone}
+    ));
+})

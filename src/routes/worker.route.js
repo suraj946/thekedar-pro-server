@@ -2,7 +2,7 @@ import { Router } from "express";
 import {authenticate} from "../middlewares/auth.middleware.js";
 import { 
     createWorker, 
-    deleteWorker, 
+    deleteWorkerMultiple, 
     getAllWorkers, 
     getWokerDetails, 
     getWorkerForAttendance, 
@@ -23,8 +23,8 @@ router.route("/updatestatus").put(authenticate, toggleActiveStatus);
 router.route("/single/:workerId")
       .put(authenticate, updateWorker)
       .get(authenticate, getWokerDetails)
-      .delete(authenticate, deleteWorker);
-
+      
+router.route("/delete").post(authenticate, deleteWorkerMultiple);
 router.route("/get-worker-for-attendance").get(authenticate, getWorkerForAttendance);
 
 export default router;

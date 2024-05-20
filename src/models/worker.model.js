@@ -48,7 +48,6 @@ const workerSchema = new mongoose.Schema({
     currentRecordId:{
         type:mongoose.Schema.Types.ObjectId,
         ref:'MonthlyRecord',
-        required:[true, "RecordId is required for workers"],
     }
 });
 

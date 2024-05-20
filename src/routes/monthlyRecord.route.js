@@ -3,6 +3,7 @@ import {authenticate} from "../middlewares/auth.middleware.js";
 import { 
     addAttendence, 
     adjustGivenAmountOnSettlement, 
+    checkAttendanceForToday, 
     createAttendance, 
     createMonthlyRecord, 
     deleteAttendence, 
@@ -33,5 +34,7 @@ router.route("/settlement").post(authenticate, settleAccount);
 router.route("/adjust-settlement").post(authenticate, adjustGivenAmountOnSettlement);
 router.route("/all-settlements/:recordId").get(authenticate, getAllSettlementOfMonth);
 router.route("/single-settlement").get(authenticate, getSingleSettlement);
+
+router.route("/check-attendence/:recordId").get(authenticate, checkAttendanceForToday);
 
 export default router;

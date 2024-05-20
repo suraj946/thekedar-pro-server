@@ -32,7 +32,17 @@ const thekedarSchema = new mongoose.Schema({
         required:[true, "Company name is required"]
     },
     otp:Number,
-    otp_expire:Date
+    otp_expire:Date,
+    runningDate:{
+        year:{
+            type:Number,
+            required:true
+        },
+        monthIndex:{
+            type:Number,
+            required:true
+        },
+    }
 },{timestamps:true});
 
 thekedarSchema.pre("save", async function(next){
