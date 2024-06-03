@@ -5,6 +5,7 @@ import {
     loadUser, 
     login, 
     logout, 
+    newMonthArrival, 
     register, 
     resetPassword, 
     updateProfile
@@ -21,5 +22,6 @@ router.route("/updateprofile").put(authenticate, updateProfile);
 router.route("/changepassword").put(authenticate, changePassword);
 router.route("/forgotpassword").post(forgotPassword);
 router.route("/resetpassword").put(resetPassword);
+router.route("/newmontharrival").get(authenticate, newMonthArrival);
 
 export default router;

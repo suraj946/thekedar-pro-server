@@ -4,6 +4,7 @@
 import NepaliDate from "nepali-date-converter";
 import { ApiError } from "../utils/ApiError.js";
 import { getCurrentNepaliDate } from "../utils/utility.js";
+import { DAYS } from "../constants.js";
 
 // const date = new NepaliDate(2080, 8, 29);
 // const day = date.format("ddd D").split(" ");
@@ -247,7 +248,10 @@ import { getCurrentNepaliDate } from "../utils/utility.js";
 // };
 
 
-const d1 = getCurrentNepaliDate().dayDate;
-const d2 = new NepaliDate(new Date(Date.now())).getDate();
+// const d1 = getCurrentNepaliDate().dayDate;
 
-console.log({d1, d2});
+// const d2 = new NepaliDate(new Date(Date.now())).getDate();
+
+// console.log({d1, d2});
+
+// console.log(DAYS[new NepaliDate(`${2081}/${2}/${13}`).getDay()]);

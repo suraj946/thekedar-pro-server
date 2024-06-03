@@ -48,6 +48,10 @@ const workerSchema = new mongoose.Schema({
     currentRecordId:{
         type:mongoose.Schema.Types.ObjectId,
         ref:'MonthlyRecord',
+    },
+    previousRecordId:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'MonthlyRecord',
     }
 });
 

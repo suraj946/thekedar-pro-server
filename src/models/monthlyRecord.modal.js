@@ -75,6 +75,9 @@ const monthlyRecordSchema = new mongoose.Schema({
         dayDate:{
             type:Number,
         },
+        performedOn:{
+            type:Number
+        },
         dayName:{
             type:String,
             enum:["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],

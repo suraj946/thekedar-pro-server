@@ -4,6 +4,7 @@ import {
     addAttendence, 
     adjustGivenAmountOnSettlement, 
     checkAttendanceForToday, 
+    checkForSettlement, 
     createAttendance, 
     createMonthlyRecord, 
     deleteAttendence, 
@@ -36,5 +37,6 @@ router.route("/all-settlements/:recordId").get(authenticate, getAllSettlementOfM
 router.route("/single-settlement").get(authenticate, getSingleSettlement);
 
 router.route("/check-attendence/:recordId").get(authenticate, checkAttendanceForToday);
+router.route("/check-settlement/:recordId").get(authenticate, checkForSettlement);
 
 export default router;

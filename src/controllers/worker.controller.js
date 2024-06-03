@@ -73,7 +73,8 @@ export const createWorker = asyncHandler(async (req, res, next) => {
     address,
     wagesPerDay: Number(wagesPerDay),
     joiningDate,
-    currentRecordId: new Types.ObjectId(),
+    currentRecordId: null,
+    previousRecordId: null,
   });
 
   if (!worker) {
@@ -265,6 +266,10 @@ export const toggleActiveStatus = asyncHandler(async (req, res, next) => {
     return next(new ApiError(BAD_REQUEST, "Worker is already active"));
   }
 
+  if(worker.currentRecordId){
+    worker.previousRecordId = worker.currentRecordId;
+  }
+  
   worker.currentRecordId = null;
   worker.isActive = activeStatus;
   await worker.save();
