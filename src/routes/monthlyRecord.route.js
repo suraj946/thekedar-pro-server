@@ -1,7 +1,7 @@
 import { Router } from "express";
 import {authenticate} from "../middlewares/auth.middleware.js";
 import { 
-    addAttendence, 
+      addAttendanceForLeftDays, 
     adjustGivenAmountOnSettlement, 
     checkAttendanceForToday, 
     checkForSettlement, 
@@ -10,6 +10,7 @@ import {
     deleteAttendence, 
     getAllRecordsOfYear, 
     getAllSettlementOfMonth, 
+    getCalendarEvents, 
     getMonthlyRecord, 
     getSingleSettlement, 
     settleAccount, 
@@ -20,7 +21,7 @@ const router = Router();
 
 router.route("/create").post(authenticate, createMonthlyRecord);
 router.route("/attendence/:recordId")
-      .post(authenticate, addAttendence)
+      .post(authenticate, addAttendanceForLeftDays)
       .put(authenticate, updateAttendence)
       .delete(authenticate, deleteAttendence);
 
@@ -38,5 +39,6 @@ router.route("/single-settlement").get(authenticate, getSingleSettlement);
 
 router.route("/check-attendence/:recordId").get(authenticate, checkAttendanceForToday);
 router.route("/check-settlement/:recordId").get(authenticate, checkForSettlement);
+router.route("/calendar-events/:workerId").get(authenticate, getCalendarEvents);
 
 export default router;

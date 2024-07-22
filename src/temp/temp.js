@@ -1,8 +1,4 @@
 // import {Types} from "mongoose";
-// import NepaliDate from "nepali-date-converter";
-
-import NepaliDate from "nepali-date-converter";
-import { ApiError } from "../utils/ApiError.js";
 import { getCurrentNepaliDate } from "../utils/utility.js";
 import { DAYS } from "../constants.js";
 
@@ -133,18 +129,18 @@ import { DAYS } from "../constants.js";
 // const getDaysInMonth = (year) => {
 //   const date = new NepaliDate(2080, 8, 30);
 //   console.log({date});
-  // for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
-  //   let count = 1,
-  //   i = 3;
-  //   let date = new NepaliDate(year, monthIndex, 2).getDate();
-  //   while (date != 1) {
-  //     date = new NepaliDate(year, monthIndex, i).getDate();
-  //     count++;
-  //     i++;
-  //   }
+// for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+//   let count = 1,
+//   i = 3;
+//   let date = new NepaliDate(year, monthIndex, 2).getDate();
+//   while (date != 1) {
+//     date = new NepaliDate(year, monthIndex, i).getDate();
+//     count++;
+//     i++;
+//   }
 
-  //   console.log(`${monthIndex+1} : ${count} days`);
-  // }
+//   console.log(`${monthIndex+1} : ${count} days`);
+// }
 // };
 
 // getDaysInMonth(2081);
@@ -153,17 +149,16 @@ import { DAYS } from "../constants.js";
 
 // console.log(new Types.ObjectId());
 
-
 // const forSingle = async(name, email, i) => {
 //   try {
 //     if(!name){
 //       throw new ApiError(401, "name is required", {id:i});
 //     }
-  
+
 //     if(!email){
 //       throw new ApiError(401, "email is required", {id:i});
 //     }
-  
+
 //     return await Promise.resolve({success:true});
 //   } catch (error) {
 //     return Promise.reject({
@@ -208,8 +203,6 @@ import { DAYS } from "../constants.js";
 
 // done();
 
-
-
 // const worker = {
 //   _id: '657af5a169a5a97d9cbfe5a4',
 //   name: 'Ramesh Sah',
@@ -247,7 +240,6 @@ import { DAYS } from "../constants.js";
 //   },
 // };
 
-
 // const d1 = getCurrentNepaliDate().dayDate;
 
 // const d2 = new NepaliDate(new Date(Date.now())).getDate();
@@ -255,3 +247,101 @@ import { DAYS } from "../constants.js";
 // console.log({d1, d2});
 
 // console.log(DAYS[new NepaliDate(`${2081}/${2}/${13}`).getDay()]);
+
+const dailyRecords = [
+  {
+    advance: {},
+    day: "monday",
+    dayDate: 17,
+    presence: "present",
+    wagesOfDay: 800,
+    _id: "668288576ed05f70440d1bb0",
+    settlement: {
+      dayDate: 17,
+      wagesOccured: 3000,
+      advanceOccured: 0,
+      amountTaken: 2000,
+      wagesTransferred: 1000,
+      advanceTransferred: 0,
+    },
+  },
+  {
+    day: "tuesday",
+    dayDate: 18,
+    presence: "present",
+    wagesOfDay: 800,
+    _id: "6683c1156708a732e41b6ce1",
+  },
+  {
+    dayDate: 20,
+    day: "thursday",
+    settlement: {
+      dayDate: 20,
+      wagesOccured: 3000,
+      advanceOccured: 0,
+      amountTaken: 2000,
+      wagesTransferred: 1000,
+      advanceTransferred: 0,
+    },
+  },
+  {
+    dayDate: 27,
+    day: "thursday",
+    settlement: {
+      dayDate: 27,
+      wagesOccured: 3000,
+      advanceOccured: 0,
+      amountTaken: 2000,
+      wagesTransferred: 1000,
+      advanceTransferred: 0,
+    },
+  },
+  {
+    dayDate: 31,
+    day: "monday",
+    settlement: {
+      dayDate: 31,
+      wagesOccured: 3000,
+      advanceOccured: 0,
+      amountTaken: 2000,
+      wagesTransferred: 1000,
+      advanceTransferred: 0,
+    },
+  },
+];
+
+const dayIndex = getCurrentNepaliDate().dayIndex;
+const monthDetails = new Array(32).fill(null);
+
+// {
+//   date: 1,
+//   dayOfWeek: 'tuesday',
+//   hasAttendence: true,
+//   hasAdvance: true,
+//   hasSettlement: true,
+// },
+
+dailyRecords.forEach((rec) => {
+  const { dayDate, day, advance, presence, settlement } = rec;
+  monthDetails[dayDate] = {
+    date: dayDate,
+    dayOfWeek: day,
+    hasAttendence: presence ? true : false,
+    hasAdvance: advance ? true : false,
+    hasSettlement: settlement ? true : false,
+  };
+});
+
+for (let i = 1; i < monthDetails.length; i++) {
+  if (!monthDetails[i]) {
+    monthDetails[i] = {
+      date: i,
+      dayOfWeek: DAYS[(i + dayIndex - 1) % 7],
+      hasAttendence: false,
+      hasAdvance: false,
+      hasSettlement: false,
+    };
+  }
+}
+
+console.log(monthDetails);

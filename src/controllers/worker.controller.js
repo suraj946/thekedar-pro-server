@@ -3,7 +3,6 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Worker } from "../models/worker.model.js";
 import { MonthlyRecord } from "../models/monthlyRecord.modal.js";
-import NepaliDate from "nepali-date-converter";
 import {
   BAD_REQUEST,
   CREATED,
@@ -15,15 +14,7 @@ import { Types } from "mongoose";
 import { getCurrentNepaliDate } from "../utils/utility.js";
 
 export const createWorker = asyncHandler(async (req, res, next) => {
-  const {
-    name,
-    role,
-    contactNumber,
-    wagesPerDay,
-    address,
-    joiningDate,
-    numberOfDays,
-  } = req.body;
+  const { name, role, contactNumber, wagesPerDay, address } = req.body;
 
   if (name.trim() === "" || name === undefined || name === null) {
     return next(new ApiError(BAD_REQUEST, "Name of the worker is required"));
@@ -37,33 +28,7 @@ export const createWorker = asyncHandler(async (req, res, next) => {
     return next(new ApiError(BAD_REQUEST, "Wages is required"));
   }
 
-  if (!numberOfDays || isNaN(Number(numberOfDays))) {
-    return next(new ApiError(BAD_REQUEST, "Number of days is required"));
-  }
-
-  if (Number(numberOfDays) < 29 || Number(numberOfDays) > 32) {
-    return next(
-      new ApiError(
-        BAD_REQUEST,
-        "Total days in month can only be in between (29 - 32)"
-      )
-    );
-  }
-
-  const dateGiven = new NepaliDate(
-    joiningDate.year,
-    joiningDate.monthIndex,
-    joiningDate.dayDate
-  );
-  const currentDate = new NepaliDate(new Date(Date.now()));
-
-  if (
-    dateGiven.getYear() > currentDate.getYear() ||
-    dateGiven.getMonth() > currentDate.getMonth() ||
-    dateGiven.getDate() > currentDate.getDate()
-  ) {
-    return next(new ApiError(BAD_REQUEST, "Invalid date provided"));
-  }
+  const { year, monthIndex, dayDate, numberOfDays } = getCurrentNepaliDate();
 
   const worker = await Worker.create({
     name,
@@ -72,7 +37,7 @@ export const createWorker = asyncHandler(async (req, res, next) => {
     contactNumber,
     address,
     wagesPerDay: Number(wagesPerDay),
-    joiningDate,
+    joiningDate: { year, monthIndex, dayDate },
     currentRecordId: null,
     previousRecordId: null,
   });
@@ -88,9 +53,9 @@ export const createWorker = asyncHandler(async (req, res, next) => {
 
   const monthlyRecord = await MonthlyRecord.create({
     workerId: worker._id,
-    year: joiningDate.year,
-    monthIndex: joiningDate.monthIndex,
-    numberOfDays: Number(numberOfDays),
+    year,
+    monthIndex,
+    numberOfDays,
   });
 
   worker.currentRecordId = monthlyRecord._id;
@@ -106,10 +71,8 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
   if (!(status === "false" || status === "true")) {
     return next(new ApiError(BAD_REQUEST, "Invalid status provided"));
   }
-  // const workers = await Worker.find({
-  //   thekedarId: req.thekedar._id,
-  //   isActive: status === "true",
-  // }).select("name role wagesPerDay");
+
+  const {dayDate} = getCurrentNepaliDate();
 
   const workers = await Worker.aggregate([
     {
@@ -129,19 +92,29 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
         pipeline: [
           {
             $project: {
-              _id:0,
+              _id: 0,
               numberOfDays: 1,
               lastSettlementDate: {
                 $cond: {
                   if: {
-                    $eq: [{ $type: "$lastSettlementDate" }, "missing"],
+                    $eq: [ { $type: "$lastSettlementDate" }, "missing" ],
                   },
                   then: 0,
                   else: "$lastSettlementDate.dayDate",
                 },
               },
-              dailyRecords: {
-                $size: "$dailyRecords",
+              highestDayRecord: {
+                $reduce: {
+                  input: "$dailyRecords",
+                  initialValue: 0,
+                  in: {
+                    $cond: {
+                      if: { $gt: ["$$this.dayDate", "$$value"] },
+                      then: "$$this.dayDate",
+                      else: "$$value",
+                    },
+                  },
+                },
               },
             },
           },
@@ -163,8 +136,8 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
               $eq: [
                 {
                   $and: [
-                    { $gt: ["$records.dailyRecords", 0] },
-                    { $lt: ["$records.lastSettlementDate", getCurrentNepaliDate().dayDate] },
+                    { $gt: [ "$records.highestDayRecord", "$records.lastSettlementDate" ] },
+                    { $lt: [ "$records.lastSettlementDate", dayDate ] },
                   ],
                 },
                 true,
@@ -174,6 +147,13 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
             else: false,
           },
         },
+        markedToday:{
+          $cond:{
+            if: { $lt: [ "$records.highestDayRecord", dayDate ] }, 
+            then: false, 
+            else: true
+          }
+        }
       },
     },
     {
@@ -183,7 +163,9 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
         wagesPerDay: 1,
         readyForSettlement: 1,
         records: 1,
-        currentRecordId:1
+        currentRecordId: 1,
+        previousRecordId: 1,
+        markedToday: 1
       },
     },
   ]);
@@ -266,10 +248,10 @@ export const toggleActiveStatus = asyncHandler(async (req, res, next) => {
     return next(new ApiError(BAD_REQUEST, "Worker is already active"));
   }
 
-  if(worker.currentRecordId){
+  if (worker.currentRecordId) {
     worker.previousRecordId = worker.currentRecordId;
   }
-  
+
   worker.currentRecordId = null;
   worker.isActive = activeStatus;
   await worker.save();
@@ -437,8 +419,9 @@ export const deleteWorkerMultiple = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(OK, "Worker delete operation success", response));
 });
 
+//handled by getWorkers
 export const getWorkerForAttendance = asyncHandler(async (req, res, next) => {
-  const dayDate = new NepaliDate().getDate();
+  const dayDate = getCurrentNepaliDate().dayDate;
   const workers = await Worker.aggregate([
     {
       $match: {

@@ -1,19 +1,26 @@
 import { createTransport } from "nodemailer";
 import { ApiResponse } from "./ApiResponse.js";
-import NepaliDate from "nepali-date-converter";
+import { getNepaliDateFromAD, getNepaliDateFromBS } from "../nep_dates/index.js";
 
-export const getCurrentNepaliDate = () => {
-  const {year, month, date, day} = new NepaliDate().getDateObject().BS;
-  return {
-    year,
-    monthIndex:month,
-    dayDate:date,
-    dayIndex:day
+export const getCurrentNepaliDate = (dateStr, type="BS") => {
+  if(!dateStr) return getNepaliDateFromAD();
+  if(!["AD", "BS"].includes(type)) throw new Error("Invalid date type");
+
+  const regex = /^\d{4}-([1-9]|1[0-2])-([1-9]|[12][0-9]|3[0-2])$/;
+  if(!regex.test(dateStr)) throw new Error("Invalid date format should be YYYY-MM-DD");
+  const date = dateStr.split('-').map(d => Number(d));
+  const [year, month, dayDate] = date;
+  if(type === "AD"){
+    return getNepaliDateFromAD({year, month, dayDate});
+  }
+
+  if(type === "BS"){
+    return getNepaliDateFromBS({year, month, dayDate});
   }
 }
 
-export const isMonthChanged = (runningDate) => {
-  const {monthIndex, year} = getCurrentNepaliDate();
+export const isMonthChanged = (runningDate, currentDate) => {
+  const {monthIndex, year} = currentDate;
   const {year:runningYear, monthIndex:runningMonthIndex} = runningDate;
   let isInitialCall;
 
@@ -28,6 +35,7 @@ export const isMonthChanged = (runningDate) => {
 
 export const sendToken = async(thekedar, statusCode, res, message) => {
   const jwtToken = await thekedar.generateJWTToken();
+  const currentDate = getCurrentNepaliDate();
   thekedar["password"] = undefined;
   res
     .status(statusCode)
@@ -39,7 +47,8 @@ export const sendToken = async(thekedar, statusCode, res, message) => {
     })
     .json(new ApiResponse(statusCode, message, {
       thekedar,
-      isInitialCall: isMonthChanged(thekedar.runningDate),
+      isInitialCall: isMonthChanged(thekedar.runningDate, currentDate),
+      currentDate
     }));
 };
 
@@ -107,7 +116,7 @@ export const sendEmail = async ({toEmail, subject, otp, heading, description}) =
             color: #fff;
             text-align: center;
             background-color: #ff0040;
-            width: 120px;
+            width: 170px;
             margin: 20px auto;
             padding: 10px;
             border-radius: 5px;

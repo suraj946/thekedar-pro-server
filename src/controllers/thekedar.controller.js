@@ -158,7 +158,7 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
     return next(new ApiError(NOT_FOUND, "No user found with this email"));
   }
   const otp = Math.floor(Math.random() * (999999 - 100000) + 100000);
-  const otpExpire = 15 * 60 * 100;
+  const otpExpire = 15 * 60 * 1000;
   thekedar.otp = otp;
   thekedar.otp_expire = new Date(Date.now() + otpExpire);
   await thekedar.save();
@@ -218,11 +218,13 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
 
 export const loadUser = asyncHandler(async (req, res, next) => {
   const thekedar = req.thekedar;
-  let isInitialCall = isMonthChanged(thekedar.runningDate);
+  const currentDate = getCurrentNepaliDate();
+  let isInitialCall = isMonthChanged(thekedar.runningDate, currentDate);
   res.status(OK).json(
     new ApiResponse(OK, "Load user success", {
       isInitialCall,
       thekedar,
+      currentDate
     })
   );
 });
