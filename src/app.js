@@ -21,6 +21,10 @@ import monthlyRecordRoute from "./routes/monthlyRecord.route.js";
 import siteRoute from "./routes/site.route.js";
 import paymentRoute from "./routes/payment.route.js";
 
+app.get("/", (req, res) => {
+    res.send("Thekedar Pro Server is up and running");
+});
+
 //using routers
 app.use("/api/v1/thekedar", thekedarRoute);
 app.use("/api/v1/worker", workerRoute);
