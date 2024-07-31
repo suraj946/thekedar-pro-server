@@ -18,11 +18,15 @@ app.use(cookieParser());
 import thekedarRoute from "./routes/thekedar.route.js";
 import workerRoute from "./routes/worker.route.js";
 import monthlyRecordRoute from "./routes/monthlyRecord.route.js";
+import siteRoute from "./routes/site.route.js";
+import paymentRoute from "./routes/payment.route.js";
 
 //using routers
 app.use("/api/v1/thekedar", thekedarRoute);
 app.use("/api/v1/worker", workerRoute);
 app.use("/api/v1/record", monthlyRecordRoute);
+app.use("/api/v1/site", siteRoute);
+app.use("/api/v1/payment", paymentRoute);
 
 //error middleware
 app.use(error);

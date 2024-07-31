@@ -504,6 +504,7 @@ export const getAllRecordsOfYear = asyncHandler(async (req, res, next) => {
         numberOfDays: 1,
       },
     },
+    {$sort:{monthIndex:-1}}
   ]);
 
   res.status(OK).json(new ApiResponse(OK, "All records get success", records));
@@ -900,4 +901,41 @@ export const getCalendarEvents = asyncHandler(async (req, res, next) => {
       lastSettlementDate: monthlyRecord.lastSettlementDate?.dayDate || 0,
     })
   );
+});
+
+export const deleteMonthlyRecord = asyncHandler(async (req, res, next) => {
+  let {recordIds, workerId} = req.body;
+  if (!recordIds || !Array.isArray(recordIds)) {
+    return next(new ApiError(BAD_REQUEST, "Invalid recordIds provided"));
+  }
+
+  if (!workerId || typeof workerId !== "string") {
+    return next(new ApiError(BAD_REQUEST, "Invalid workerId provided"));
+  }
+
+  const worker = await Worker.findById(workerId);
+  if(!worker) {
+    return next(new ApiError(NOT_FOUND, "Worker not found"));
+  }
+  const {currentRecordId, previousRecordId} = worker;
+
+  recordIds = recordIds.filter((rec) => {
+    rec = rec.toString();
+    return !(rec === currentRecordId.toString() || rec === previousRecordId?.toString());
+  });
+
+  if(recordIds.length === 0) {
+    return next(new ApiError(BAD_REQUEST, "No records to delete"));
+  }
+
+  const response = await MonthlyRecord.deleteMany({
+    $and: [
+      { _id: { $in: recordIds } },
+      { workerId: workerId },
+    ]
+  });
+
+  res
+    .status(OK)
+    .json(new ApiResponse(OK, "Monthly record deleted successfully", {response}));
 });

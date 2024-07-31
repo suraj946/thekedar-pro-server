@@ -8,6 +8,7 @@ import {
     createAttendance, 
     createMonthlyRecord, 
     deleteAttendence, 
+    deleteMonthlyRecord, 
     getAllRecordsOfYear, 
     getAllSettlementOfMonth, 
     getCalendarEvents, 
@@ -40,5 +41,7 @@ router.route("/single-settlement").get(authenticate, getSingleSettlement);
 router.route("/check-attendence/:recordId").get(authenticate, checkAttendanceForToday);
 router.route("/check-settlement/:recordId").get(authenticate, checkForSettlement);
 router.route("/calendar-events/:workerId").get(authenticate, getCalendarEvents);
+
+router.route("/delete").post(authenticate, deleteMonthlyRecord);
 
 export default router;
