@@ -439,8 +439,7 @@ export const deleteAttendence = asyncHandler(async (req, res, next) => {
   ) {
     return next(new ApiError(BAD_REQUEST, "Invalid day date for deletion"));
   }
-  return res.send("batawa");
-
+  
   const record = monthlyRecord.dailyRecords.find(
     (rec) => rec.dayDate === dayDate
   );
