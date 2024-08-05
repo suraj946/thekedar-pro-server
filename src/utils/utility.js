@@ -1,6 +1,7 @@
 import { createTransport } from "nodemailer";
 import { ApiResponse } from "./ApiResponse.js";
 import { getNepaliDateFromAD, getNepaliDateFromBS } from "../nep_dates/index.js";
+import { Worker } from "../models/worker.model.js";
 
 export const getCurrentNepaliDate = (dateStr, type="BS") => {
   if(!dateStr) return getNepaliDateFromAD();
@@ -36,6 +37,7 @@ export const isMonthChanged = (runningDate, currentDate) => {
 export const sendToken = async(thekedar, statusCode, res, message) => {
   const jwtToken = await thekedar.generateJWTToken();
   const currentDate = getCurrentNepaliDate();
+  const workersCount = await Worker.countDocuments({thekedarId: thekedar._id});
   thekedar["password"] = undefined;
   res
     .status(statusCode)
@@ -48,7 +50,8 @@ export const sendToken = async(thekedar, statusCode, res, message) => {
     .json(new ApiResponse(statusCode, message, {
       thekedar,
       isInitialCall: isMonthChanged(thekedar.runningDate, currentDate),
-      currentDate
+      currentDate,
+      workersCount
     }));
 };
 

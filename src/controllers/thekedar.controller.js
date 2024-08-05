@@ -219,12 +219,14 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
 export const loadUser = asyncHandler(async (req, res, next) => {
   const thekedar = req.thekedar;
   const currentDate = getCurrentNepaliDate();
+  const workersCount = await Worker.countDocuments({thekedarId: thekedar._id});
   let isInitialCall = isMonthChanged(thekedar.runningDate, currentDate);
   res.status(OK).json(
     new ApiResponse(OK, "Load user success", {
       isInitialCall,
       thekedar,
-      currentDate
+      currentDate,
+      workersCount
     })
   );
 });
