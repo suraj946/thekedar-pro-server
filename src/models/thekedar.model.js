@@ -3,6 +3,11 @@ import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken";
 
 const thekedarSchema = new mongoose.Schema({
+    googleId:{
+        type: String,
+        trim:true,
+        unique:true,
+    },
     name:{
         type:String,
         required:[true, "Name is required"],
@@ -17,7 +22,6 @@ const thekedarSchema = new mongoose.Schema({
     },
     password:{
         type:String,
-        required:[true, "Password is required"],
     },
     contactNumber:{
         type:String,
@@ -29,7 +33,6 @@ const thekedarSchema = new mongoose.Schema({
     companyName:{
         type:String,
         trim:true,
-        required:[true, "Company name is required"]
     },
     otp:Number,
     otp_expire:Date,

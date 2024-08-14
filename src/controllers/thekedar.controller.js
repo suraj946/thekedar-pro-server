@@ -19,6 +19,43 @@ import {
 } from "../constants.js";
 import { cookieOptions } from "../utils/utility.js";
 import { Types } from "mongoose";
+import { verifyGoogleIdToken } from "../utils/social.js";
+
+export const googleSignIn = asyncHandler(async (req, res, next) => {
+  const { idToken } = req.body;
+  if (!idToken) {
+    return next(new ApiError(BAD_REQUEST, "Id token is required"));
+  }
+  const { success, payload} = await verifyGoogleIdToken(idToken);
+  if (!success) {
+    return next(new ApiError(BAD_REQUEST, payload));
+  }
+  let thekedar = await Thekedar.findOne({ googleId: payload.sub });
+  if (!thekedar) {
+    // create new thekedar
+    const isEmailAlreadyInUse = await Thekedar.findOne({ email: payload.email });
+    if (isEmailAlreadyInUse) {
+      return next(new ApiError(BAD_REQUEST, "This email is already in use"));
+    }
+    const { year, monthIndex } = getCurrentNepaliDate();
+    console.log("Creating new thekedar");
+    thekedar = await Thekedar.create({
+      name: payload.name,
+      email: payload.email,
+      googleId: payload.sub,
+      runningDate: { year, monthIndex },
+    });
+    if(!thekedar) {
+      return next(
+        new ApiError(
+          INTERNAL_SERVER_ERROR,
+          "Something went wrong while registering"
+        )
+      );
+    }
+  }
+  sendToken(thekedar, OK, res, "Login Successful");
+});
 
 export const register = asyncHandler(async (req, res, next) => {
   const { name, email, password, contactNumber, address, companyName } =
@@ -78,6 +115,12 @@ export const login = asyncHandler(async (req, res, next) => {
   const thekedar = await Thekedar.findOne({ email });
   if (!thekedar) {
     return next(new ApiError(UNAUTHORIZED, "Invalid email or password"));
+  }
+
+  if (!thekedar.password) {
+    return next(
+      new ApiError(BAD_REQUEST, "Invalid email or password")
+    );
   }
 
   const isPasswordCorrect = await thekedar.isPasswordCorrect(password);

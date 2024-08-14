@@ -2,6 +2,7 @@ import {Router} from "express";
 import { 
     changePassword, 
     forgotPassword, 
+    googleSignIn, 
     loadUser, 
     login, 
     logout, 
@@ -14,6 +15,7 @@ import { authenticate } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
+router.route("/google-signin").post(googleSignIn);
 router.route("/register").post(register);
 router.route("/login").post(login);
 router.route("/loaduser").get(authenticate, loadUser);
