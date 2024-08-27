@@ -146,7 +146,7 @@ export const createMonthlyRecord = asyncHandler(async (req, res, next) => {
   res
     .status(CREATED)
     .json(
-      new ApiResponse(CREATED, "Record is created", { settlementResponse })
+      new ApiResponse(CREATED, "Record is created", { settlementResponse, recordId: monthlyRecord._id })
     );
 });
 
@@ -329,7 +329,7 @@ export const createAttendance = asyncHandler(async (req, res, next) => {
 export const updateAttendence = asyncHandler(async (req, res, next) => {
   const { dayDate, presence, wagesOfDay, advanceAmount, advancePurpose } =
     req.body;
-  const recordId = req.params?.recordId;
+  const recordId = req.params?.recordId;  
   const monthlyRecord = await MonthlyRecord.findById(recordId);
 
   if (!monthlyRecord) {

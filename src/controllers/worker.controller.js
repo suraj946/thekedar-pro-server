@@ -67,20 +67,19 @@ export const createWorker = asyncHandler(async (req, res, next) => {
 });
 
 export const getAllWorkers = asyncHandler(async (req, res, next) => {
-  const status = req.query.status.trim();
-  if (!(status === "false" || status === "true")) {
-    return next(new ApiError(BAD_REQUEST, "Invalid status provided"));
+  const status = req.query.status?.trim();
+  if (status) {
+    if (!(status === "false" || status === "true")) {
+      return next(new ApiError(BAD_REQUEST, "Invalid status provided"));
+    }
   }
 
-  const {dayDate} = getCurrentNepaliDate();
+  const { dayDate } = getCurrentNepaliDate();
 
   const workers = await Worker.aggregate([
     {
       $match: {
-        $and: [
-          { thekedarId: new Types.ObjectId(req.thekedar._id) },
-          { isActive: status === "true" },
-        ],
+        thekedarId: new Types.ObjectId(req.thekedar._id),
       },
     },
     {
@@ -97,7 +96,7 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
               lastSettlementDate: {
                 $cond: {
                   if: {
-                    $eq: [ { $type: "$lastSettlementDate" }, "missing" ],
+                    $eq: [{ $type: "$lastSettlementDate" }, "missing"],
                   },
                   then: 0,
                   else: "$lastSettlementDate.dayDate",
@@ -136,8 +135,13 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
               $eq: [
                 {
                   $and: [
-                    { $gt: [ "$records.highestDayRecord", "$records.lastSettlementDate" ] },
-                    { $lt: [ "$records.lastSettlementDate", dayDate ] },
+                    {
+                      $gt: [
+                        "$records.highestDayRecord",
+                        "$records.lastSettlementDate",
+                      ],
+                    },
+                    { $lt: ["$records.lastSettlementDate", dayDate] },
                   ],
                 },
                 true,
@@ -147,13 +151,13 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
             else: false,
           },
         },
-        markedToday:{
-          $cond:{
-            if: { $lt: [ "$records.highestDayRecord", dayDate ] }, 
-            then: false, 
-            else: true
-          }
-        }
+        markedToday: {
+          $cond: {
+            if: { $lt: ["$records.highestDayRecord", dayDate] },
+            then: false,
+            else: true,
+          },
+        },
       },
     },
     {
@@ -165,11 +169,26 @@ export const getAllWorkers = asyncHandler(async (req, res, next) => {
         records: 1,
         currentRecordId: 1,
         previousRecordId: 1,
-        markedToday: 1
+        markedToday: 1,
+        isActive: 1,
       },
     },
   ]);
-  res.status(OK).json(new ApiResponse(OK, "Get worker success", workers));
+  const activeWorkers = [], inactiveWorkers = [];
+  for(let i = 0; i < workers.length; i++){
+    if(workers[i].isActive) activeWorkers.push(workers[i]);
+    else inactiveWorkers.push(workers[i]);
+  } 
+  let response = {
+    activeWorkers: [],
+    inactiveWorkers: [],
+  };
+  if (status) {
+    if (status === "true") response.activeWorkers = activeWorkers;
+    else response.inactiveWorkers = inactiveWorkers;
+  }else response = {activeWorkers, inactiveWorkers};
+
+  res.status(OK).json(new ApiResponse(OK, "Get worker success", response));
 });
 
 //this is handled by the updateWorker api
@@ -256,7 +275,13 @@ export const toggleActiveStatus = asyncHandler(async (req, res, next) => {
   worker.isActive = activeStatus;
   await worker.save();
 
-  res.status(OK).json(new ApiResponse(OK, "Active status is updated"));
+  res
+    .status(OK)
+    .json(
+      new ApiResponse(OK, "Active status is updated", {
+        currentStatus: activeStatus,
+      })
+    );
 });
 
 export const updateWorker = asyncHandler(async (req, res, next) => {
