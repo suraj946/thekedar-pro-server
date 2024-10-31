@@ -274,9 +274,7 @@ export const loadUser = asyncHandler(async (req, res, next) => {
   );
 });
 
-export const newMonthArrival = asyncHandler(async (req, res, next) => {
-  console.log("oks");return;
-  
+export const newMonthArrival = asyncHandler(async (req, res, next) => {  
   const thekedar = await Thekedar.findById(req.thekedar._id);
   if (!thekedar) {
     return next(new ApiError(INTERNAL_SERVER_ERROR, "Something went wrong"));
